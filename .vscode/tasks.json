@@ -26,10 +26,7 @@
             "args": [
                 "${workspaceFolder}/sources/common_systems",
                 "${workspaceFolder}/sources/ECSbenchmark",
-                "${workspaceFolder}/sources/MotionMatching",
-                "${workspaceFolder}/sources/Arcade",
-                "${workspaceFolder}/sources/Territorio",
-                "${workspaceFolder}/sources/Strategy",
+                "${workspaceFolder}/sources/MotionMatching"
             ],
             "group": {
                 "kind": "build",

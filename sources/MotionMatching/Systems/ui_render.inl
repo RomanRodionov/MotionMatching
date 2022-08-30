@@ -1,4 +1,3 @@
-
 #include <ecs.h>
 #include <imgui.h>
 #include "Animation/animation_player.h"

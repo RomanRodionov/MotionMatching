@@ -39,6 +39,7 @@ MotionMatching::MotionMatching(AnimationDataBasePtr dataBase, AnimationLerpedInd
 dataBase(dataBase), index(index), skip_time(0), lod(0)
 {  
 }
+
 AnimationLerpedIndex MotionMatching::get_index() const
 {
   return index;

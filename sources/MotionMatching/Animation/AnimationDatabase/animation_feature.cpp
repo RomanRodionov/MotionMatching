@@ -81,9 +81,12 @@ MatchingScores get_score(const FrameFeature& clip_feature, const FrameFeature& g
 
 float path_norma(const AnimationTrajectory& clip_feature, const AnimationTrajectory &goal_feature, const MotionMatchingSettings &settings)
 {
-  return goal_path_norma(clip_feature, goal_feature) * settings.goalPathMatchingWeight+
-    trajectory_v_norma(clip_feature, goal_feature) * settings.goalVelocityWeight+
-    trajectory_w_norma(clip_feature, goal_feature) * settings.goalAngularVelocityWeight;
+  return 
+  goal_path_norma(clip_feature, goal_feature) * settings.goalPathMatchingWeight
+    +
+  trajectory_v_norma(clip_feature, goal_feature) * settings.goalVelocityWeight
+    +
+  trajectory_w_norma(clip_feature, goal_feature) * settings.goalAngularVelocityWeight;
 }
 
 float FrameMetric::distance(const FrameFeature& clip_feature, const FrameFeature &goal_feature) const

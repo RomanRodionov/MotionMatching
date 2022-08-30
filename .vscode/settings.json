@@ -125,27 +125,6 @@
         "value":{
           "name":"ECSbenchmark",
         }
-      },
-      {
-        "name": "Strategy",
-        "value":{
-          "name":"Strategy",
-          "delpoy_only_project_folder":"false"
-        }
-      },
-      {
-        "name": "Arcade",
-        "value":{
-          "name":"Arcade",
-          "delpoy_only_project_folder":"false"
-        }
-      },
-      {
-        "name": "Territorio",
-        "value":{
-          "name":"Territorio",
-          "delpoy_only_project_folder":"true"
-        }
       }
     ]
   },

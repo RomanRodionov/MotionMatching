@@ -4,7 +4,6 @@
             "name": "Windows",
             "includePath": [
                 "${workspaceFolder}/sources/MotionMatching/**",
-                "${workspaceFolder}/sources/Strategy/**",
                 "${workspaceFolder}/sources/engine/**",
                 "${workspaceFolder}/sources/ecs/**",
                 "${workspaceFolder}/sources/ECSbenchmark/**",
