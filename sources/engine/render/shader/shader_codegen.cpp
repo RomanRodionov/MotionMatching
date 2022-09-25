@@ -21,6 +21,7 @@ static const regex shader_regex("#shader" SPACE_REGEX NAME_REGEX);
 static const regex variant_regex("#variant" SPACE_REGEX NAME_REGEX SPACE_REGEX ARGS_REGEX "[;]");
 static const regex vs_regex("#vertex_shader");
 static const regex ps_regex("#pixel_shader");
+static const regex cs_regex("#compute_shader");
 static const regex include_regex("#include" SPACE_REGEX NAME_REGEX);
 static const regex include_with_defines_regex("#include" SPACE_REGEX NAME_REGEX SPACE_REGEX "(" ARGS_REGEX ")");//todo
 
@@ -67,6 +68,7 @@ void try_load_shader_code(ShaderFileDependency &shader)
   get_matches(shader.lexems, shader.content, variant_regex, ShaderLexema::VARIANT);
   get_matches(shader.lexems, shader.content, vs_regex, ShaderLexema::VS_SHADER);
   get_matches(shader.lexems, shader.content, ps_regex, ShaderLexema::PS_SHADER);
+  get_matches(shader.lexems, shader.content, cs_regex, ShaderLexema::CS_SHADER);
   shader.isShaderFile = !shader.lexems.empty();
   get_matches(shader.lexems, shader.content, include_regex, ShaderLexema::INCLUDE);
   std::sort(shader.lexems.begin(), shader.lexems.end(), 
@@ -219,24 +221,32 @@ void insert_includes(string &text, const string &file_name, const string &source
 struct ParseState
 {
   string commonPart, currentShader;
-  string vsPart, psPart;
-  bool startShader, startPs, startVs;
+  string vsPart, psPart, csPart;
+  bool startShader, startPs, startVs, startCs;
   void clear()
   {
-    commonPart.clear(); vsPart.clear(); psPart.clear(); currentShader.clear();
-    startShader = startPs = startVs = false;
+    commonPart.clear(); vsPart.clear(); psPart.clear(); csPart.clear(); currentShader.clear();
+    startShader = startPs = startVs = startCs = false;
 
   }
 };
-static void create_shader_from_parsed_state(const fs::path &path, const ParseState &state, const string &predefine)
+static void create_shader_from_parsed_state(const fs::path &path, const ParseState &state, const string &predefine, ShaderType type = ShaderType::GRAPHICS)
 {
-  string vsPart = "#version 450\n#define VS 1\n" + predefine + state.commonPart + state.vsPart;
-  string psPart = "#version 450\n#define PS 1\n" + predefine + state.commonPart + state.psPart;
-  
-  vector<pair<uint, const char*>> shaderCode{
-    {GL_VERTEX_SHADER, vsPart.c_str()},
-    {GL_FRAGMENT_SHADER, psPart.c_str()}
-  };
+  string csPart, vsPart, psPart;
+  vector<pair<uint, const char*>> shaderCode;
+  switch (type)
+  {
+    case ShaderType::COMPUTE:
+      csPart = "#version 450\n#define CS 1\n" + predefine + state.commonPart + state.vsPart;
+      shaderCode.push_back({GL_COMPUTE_SHADER, csPart.c_str()});
+    break;
+    case ShaderType::GRAPHICS:
+      vsPart = "#version 450\n#define VS 1\n" + predefine + state.commonPart + state.vsPart;
+      psPart = "#version 450\n#define PS 1\n" + predefine + state.commonPart + state.psPart;
+      shaderCode.push_back({GL_VERTEX_SHADER, vsPart.c_str()});
+      shaderCode.push_back({GL_FRAGMENT_SHADER, psPart.c_str()});
+    break;
+  }
   uint program;
   if (compile_shader(state.currentShader, shaderCode, program))
   {
@@ -245,21 +255,29 @@ static void create_shader_from_parsed_state(const fs::path &path, const ParseSta
   else
   {
     debug_error("shader %s doesn't compiled", state.currentShader.c_str());
+    if (type == ShaderType::COMPUTE)
     {
-      ofstream file(fs::path(path).concat("." + state.currentShader + ".ps"));
-      file << psPart;
+      ofstream file(fs::path(path).concat("." + state.currentShader + ".cs"));
+      file << csPart;
     }
+    else
     {
-      ofstream file(fs::path(path).concat("." + state.currentShader + ".vs"));
-      file << vsPart;
+      {
+        ofstream file(fs::path(path).concat("." + state.currentShader + ".ps"));
+        file << psPart;
+      }
+      {
+        ofstream file(fs::path(path).concat("." + state.currentShader + ".vs"));
+        file << vsPart;
+      }
     }
   }
 }
-static void create_shader_from_parsed_state(const ShaderFileDependency &shader, ParseState &state)
+static void create_shader_from_parsed_state(const ShaderFileDependency &shader, ParseState &state, ShaderType type = ShaderType::GRAPHICS)
 {
   if (shader.intervals.empty())
   {
-    create_shader_from_parsed_state(shader.path, state, "");
+    create_shader_from_parsed_state(shader.path, state, "", type);
   }
   else
   {
@@ -332,6 +350,11 @@ void process_codegen_shaders()
           state.startPs = true;
           //debug_log("ps shader");
           insert_includes(state.psPart, shaderName, shader.content, shader.lexems, i);
+        break;
+        case ShaderLexema::CS_SHADER:
+          state.startCs = true;
+          //debug_log("cs shader");
+          insert_includes(state.csPart, shaderName, shader.content, shader.lexems, i);
         break;
         default:
           i++;

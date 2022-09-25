@@ -13,12 +13,19 @@ struct PrecompiledShader
   (uint) (format))
 };
 
+enum class ShaderType
+{
+  GRAPHICS,
+  COMPUTE
+};
+
 enum class ShaderLexema
 {
   SHADER_NAME,
   VARIANT,
   VS_SHADER,
   PS_SHADER,
+  CS_SHADER,
   INCLUDE
 };
 struct MatchRange
