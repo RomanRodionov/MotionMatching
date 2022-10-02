@@ -5,12 +5,7 @@
 #include "type_registration.h"
 
 ECS_REGISTER_TYPE(shader, Shader, true, true);
-struct ShaderInfo
-{
-  GLuint program;
-  bool compiled;//or loaded
-  ShaderBuffer buffer; 
-};
+
 void read_shader_info(const std::string &, ShaderInfo &shader);
 
 static std::vector<std::pair<std::string, ShaderInfo>> shaderList;

@@ -8,6 +8,13 @@
 #define BAD_PROGRAM 0
 struct StorageBuffer;
 
+struct ShaderInfo
+{
+  GLuint program;
+  bool compiled;//or loaded
+  ShaderBuffer buffer; 
+};
+
 class Shader
 {
 private:
