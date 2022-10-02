@@ -30,6 +30,7 @@ bool compile_shader(const string &shaderName, const vector<pair<GLuint, const ch
     {
       GLuint shaderProg = glCreateShader(codes.first);
       const GLchar * shaderCode = codes.second;
+      //debug_log("shader code:\n%s", shaderCode);
       glShaderSource(shaderProg, 1, &shaderCode, NULL);
       glCompileShader(shaderProg);
       glGetShaderiv(shaderProg, GL_COMPILE_STATUS, &success);

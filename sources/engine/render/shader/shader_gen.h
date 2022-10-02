@@ -13,12 +13,6 @@ struct PrecompiledShader
   (uint) (format))
 };
 
-enum class ShaderType
-{
-  GRAPHICS,
-  COMPUTE
-};
-
 enum class ShaderLexema
 {
   SHADER_NAME,

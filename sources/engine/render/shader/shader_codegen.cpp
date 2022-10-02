@@ -230,22 +230,21 @@ struct ParseState
 
   }
 };
-static void create_shader_from_parsed_state(const fs::path &path, const ParseState &state, const string &predefine, ShaderType type = ShaderType::GRAPHICS)
+static void create_shader_from_parsed_state(const fs::path &path, const ParseState &state, const string &predefine)
 {
   string csPart, vsPart, psPart;
   vector<pair<uint, const char*>> shaderCode;
-  switch (type)
+  if (state.startCs)
   {
-    case ShaderType::COMPUTE:
-      csPart = "#version 450\n#define CS 1\n" + predefine + state.commonPart + state.vsPart;
-      shaderCode.push_back({GL_COMPUTE_SHADER, csPart.c_str()});
-    break;
-    case ShaderType::GRAPHICS:
-      vsPart = "#version 450\n#define VS 1\n" + predefine + state.commonPart + state.vsPart;
-      psPart = "#version 450\n#define PS 1\n" + predefine + state.commonPart + state.psPart;
-      shaderCode.push_back({GL_VERTEX_SHADER, vsPart.c_str()});
-      shaderCode.push_back({GL_FRAGMENT_SHADER, psPart.c_str()});
-    break;
+    csPart = "#version 450\n#define CS 1\n" + predefine + state.commonPart + state.csPart;
+    shaderCode.push_back({GL_COMPUTE_SHADER, csPart.c_str()});
+  }
+  else
+  {
+    vsPart = "#version 450\n#define VS 1\n" + predefine + state.commonPart + state.vsPart;
+    psPart = "#version 450\n#define PS 1\n" + predefine + state.commonPart + state.psPart;
+    shaderCode.push_back({GL_VERTEX_SHADER, vsPart.c_str()});
+    shaderCode.push_back({GL_FRAGMENT_SHADER, psPart.c_str()});
   }
   uint program;
   if (compile_shader(state.currentShader, shaderCode, program))
@@ -255,7 +254,7 @@ static void create_shader_from_parsed_state(const fs::path &path, const ParseSta
   else
   {
     debug_error("shader %s doesn't compiled", state.currentShader.c_str());
-    if (type == ShaderType::COMPUTE)
+    if (state.startCs)
     {
       ofstream file(fs::path(path).concat("." + state.currentShader + ".cs"));
       file << csPart;
@@ -273,11 +272,11 @@ static void create_shader_from_parsed_state(const fs::path &path, const ParseSta
     }
   }
 }
-static void create_shader_from_parsed_state(const ShaderFileDependency &shader, ParseState &state, ShaderType type = ShaderType::GRAPHICS)
+static void create_shader_from_parsed_state(const ShaderFileDependency &shader, ParseState &state)
 {
   if (shader.intervals.empty())
   {
-    create_shader_from_parsed_state(shader.path, state, "", type);
+    create_shader_from_parsed_state(shader.path, state, "");
   }
   else
   {
@@ -353,7 +352,7 @@ void process_codegen_shaders()
         break;
         case ShaderLexema::CS_SHADER:
           state.startCs = true;
-          //debug_log("cs shader");
+          debug_log("cs shader");
           insert_includes(state.csPart, shaderName, shader.content, shader.lexems, i);
         break;
         default:

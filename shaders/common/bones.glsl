@@ -30,7 +30,6 @@ void main()
   ModelNorm[1] = normalize(ModelNorm[1]);
   ModelNorm[2] = normalize(ModelNorm[2]);
   vsOutput.EyespaceNormal = normalize(ModelNorm * Normal);
-
 }
 
 #pixel_shader
