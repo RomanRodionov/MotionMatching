@@ -17,4 +17,5 @@ public:
 	ComputeShader() :shaderIdx(-1){}
 	ComputeShader(int shaderIdx):shaderIdx(shaderIdx){}
 	ComputeShader(const std::string &shader_name, GLuint shader_program, bool compiled, bool update_list = false);
+  void dispatch(vec2 work_groups) const;
 };

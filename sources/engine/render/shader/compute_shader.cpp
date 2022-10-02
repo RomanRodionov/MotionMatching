@@ -32,3 +32,8 @@ ComputeShader::ComputeShader(const std::string &shader_name, GLuint shader_progr
     read_shader_info(shaderList[shaderIdx].first, shaderList[shaderIdx].second);
   }
 }
+
+void ComputeShader::dispatch(vec2 work_groups) const
+{
+  glDispatchCompute(work_groups.x, work_groups.y, 1);
+}

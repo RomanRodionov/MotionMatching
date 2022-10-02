@@ -1,6 +1,7 @@
 #include "common.h"
 
 #include "shader.h"
+#include "compute_shader.h"
 #include <filesystem>
 #include <map>
 #include <vector>
@@ -249,7 +250,14 @@ static void create_shader_from_parsed_state(const fs::path &path, const ParseSta
   uint program;
   if (compile_shader(state.currentShader, shaderCode, program))
   {
-    Shader(state.currentShader, program, true, true);
+    if (state.startCs)
+    {
+      ComputeShader(state.currentShader, program, true, true);
+    }
+    else
+    {
+      Shader(state.currentShader, program, true, true);
+    }
   }
   else
   {
