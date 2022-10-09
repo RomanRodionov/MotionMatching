@@ -57,7 +57,6 @@ namespace ecs
     entityManager->clear_scene();
     load_scene(rawScene);
     send_event(OnSceneCreated());
-
   }
 
   static void update_range(const SystemStageInterval &range)

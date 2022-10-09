@@ -32,6 +32,7 @@ public:
 	const string& get_name() const;
 	const ShaderBuffer &get_instance_data() const;
 	const vector<SamplerUniform> &get_samplers() const;
+	void dispatch(vec2 work_groups) const;
 
 	int get_uniform_location(const char *name)
 	{
@@ -114,5 +115,18 @@ public:
   }
 };
 
+class ComputeShader: public Shader
+{
+private:
+	int shaderIdx;
+public:
+	ComputeShader() :shaderIdx(-1){}
+	ComputeShader(int shaderIdx):shaderIdx(shaderIdx){}
+	ComputeShader(const std::string &shader_name, GLuint shader_program, bool compiled, bool update_list = false);
+  void dispatch(vec2 work_groups) const;
+};
+
+int get_shader_index(const std::string &shader_name);
 Shader get_shader(const std::string &shader_name, bool with_log = true);
 const vector<const char*>get_shaders_names();
+ComputeShader get_compute_shader(const std::string &shader_name, bool with_log = true);

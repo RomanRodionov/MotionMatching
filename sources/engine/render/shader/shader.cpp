@@ -7,7 +7,6 @@
 ECS_REGISTER_TYPE(shader, Shader, true, true);
 
 void read_shader_info(const std::string &, ShaderInfo &shader);
-
 static std::vector<std::pair<std::string, ShaderInfo>> shaderList;
 static Shader badShader(-1);
 
@@ -230,5 +229,48 @@ void save_precompiled_shaders(vector<PrecompiledShader> &shaders)
         save_precompiled_shader(shader, program);
       }
     }
+  }
+}
+
+static ComputeShader badComputeShader(-1);
+
+
+ComputeShader::ComputeShader(const std::string &shader_name, GLuint shader_program, bool compiled, bool update_list)
+{
+  if (shader_program == BAD_PROGRAM)
+    return;
+  for (shaderIdx = 0; shaderIdx < (int)shaderList.size() && shaderList[shaderIdx].first != shader_name; ++shaderIdx);
+
+  if (shaderIdx >= (int)shaderList.size())
+  {
+    shaderList.emplace_back(shader_name, ShaderInfo{shader_program, compiled, {}});
+    read_shader_info(shaderList.back().first, shaderList.back().second);
+  }
+  else
+  if (update_list)
+  {
+    glDeleteProgram(shaderList[shaderIdx].second.program);
+    shaderList[shaderIdx] = make_pair(shader_name, ShaderInfo{shader_program, compiled, {}});
+    read_shader_info(shaderList[shaderIdx].first, shaderList[shaderIdx].second);
+  }
+}
+
+void ComputeShader::dispatch(vec2 work_groups) const
+{
+  glDispatchCompute(work_groups.x, work_groups.y, 1);
+}
+
+ComputeShader get_compute_shader(const std::string &shader_name, bool with_log)
+{
+  int shaderIdx = get_shader_index(shader_name);
+	if (shaderIdx >= 0)
+  {
+    return ComputeShader(shaderIdx);
+  }
+  else
+  {
+    if (with_log)
+      debug_error("Can't find shader %s", shader_name.c_str());
+    return badComputeShader;
   }
 }

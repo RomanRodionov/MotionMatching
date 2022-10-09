@@ -11,6 +11,7 @@
 #include <Engine/Render/skybox.h>
 #include <Engine/Render/direction_light.h>
 #include "Animation/settings.h"
+
 template<typename Callable>
 void render_animation(Callable);
 
@@ -71,6 +72,7 @@ main_render(DebugArrow &debugArrows)
     const Settings &settings)
   {
     get_shader("animation_normal_uv").use();
+    
     animationRender.get_mesh()->get_vao().render(false);
     renderQueue.emplace_back(animationRender.get_material(), animationRender.get_mesh());
     animationRender.process(transform, animationPlayer.get_tree());

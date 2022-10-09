@@ -3,6 +3,7 @@
 #include "Animation/animation_player.h"
 #include <transform.h>
 #include <render/render.h>
+#include <render/shader/shader.h>
 #include <render/debug_arrow.h>
 #include <render/global_uniform.h>
 #include "Animation/settings.h"
@@ -45,6 +46,16 @@ SYSTEM(stage=render;scene=game, editor) process_animation(
       draw_arrow(t, p, boneOffsets[i], vec3(0,0.8f,0), width);
     }
   }
+  /*
+  if (get_shaders_names().size() > 0) {
+    for (auto it: get_shaders_names()) {
+        debug_log(it);
+    }
+    get_shader(get_shaders_names()[0]).use();
+    get_compute_shader("compute_motion").use();
+    get_compute_shader("compute_motion").dispatch(glm::vec2(1, 1));
+  }
+  */
   AnimationLerpedIndex index = animationPlayer.get_motion_matching() ? animationPlayer.get_motion_matching()->get_index() : animationPlayer.get_index();
 
   if (!index)

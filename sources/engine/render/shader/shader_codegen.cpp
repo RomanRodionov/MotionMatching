@@ -1,7 +1,6 @@
 #include "common.h"
 
 #include "shader.h"
-#include "compute_shader.h"
 #include <filesystem>
 #include <map>
 #include <vector>
