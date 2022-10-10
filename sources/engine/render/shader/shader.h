@@ -15,6 +15,10 @@ struct ShaderInfo
   ShaderBuffer buffer; 
 };
 
+struct vec2i{
+  int x, y;
+};
+
 class Shader
 {
 private:
@@ -32,7 +36,6 @@ public:
 	const string& get_name() const;
 	const ShaderBuffer &get_instance_data() const;
 	const vector<SamplerUniform> &get_samplers() const;
-	void dispatch(vec2 work_groups) const;
 
 	int get_uniform_location(const char *name)
 	{
@@ -113,6 +116,19 @@ public:
 	{
 		glUniform4fv(uniform_location, 1, glm::value_ptr(v));
   }
+	void set_image_texture_f(float* data, vec2i size, int image_unit = 0)
+	{
+		GLuint out_tex = 0;
+		glGenTextures(1, &out_tex);
+	  glActiveTexture(GL_TEXTURE0);
+	  glBindTexture(GL_TEXTURE_2D, out_tex);
+    
+	  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+
+  	glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, size.x, size.y, 0, GL_RED, GL_FLOAT, data);
+  	glBindImageTexture(image_unit, out_tex, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
+	}
 };
 
 class ComputeShader: public Shader
@@ -123,7 +139,8 @@ public:
 	ComputeShader() :shaderIdx(-1){}
 	ComputeShader(int shaderIdx):shaderIdx(shaderIdx){}
 	ComputeShader(const std::string &shader_name, GLuint shader_program, bool compiled, bool update_list = false);
-  void dispatch(vec2 work_groups) const;
+  void dispatch(vec2i work_groups) const;
+	void wait() const;
 };
 
 int get_shader_index(const std::string &shader_name);

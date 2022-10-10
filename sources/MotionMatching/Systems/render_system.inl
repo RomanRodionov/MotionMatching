@@ -46,16 +46,23 @@ SYSTEM(stage=render;scene=game, editor) process_animation(
       draw_arrow(t, p, boneOffsets[i], vec3(0,0.8f,0), width);
     }
   }
-  /*
-  if (get_shaders_names().size() > 0) {
-    for (auto it: get_shaders_names()) {
-        debug_log(it);
-    }
-    get_shader(get_shaders_names()[0]).use();
-    get_compute_shader("compute_motion").use();
-    get_compute_shader("compute_motion").dispatch(glm::vec2(1, 1));
+  vec2i arr_size = {16, 16};
+  vec2i dispatch_size = {1, 1};
+  GLfloat *data = new GLfloat[arr_size.x * arr_size.y];
+	for (int i = 0; i < arr_size.x; ++i) {
+		for (int j = 0; j < arr_size.y; ++j) {
+			data[i * arr_size.y + j] = i * arr_size.y + j;
+		}
   }
-  */
+  get_compute_shader("compute_motion").use();
+  get_compute_shader("compute_motion").set_image_texture_f(data, arr_size);
+	get_compute_shader("compute_motion").dispatch(dispatch_size);
+	get_compute_shader("compute_motion").wait();
+	unsigned int collection_size = arr_size.x * arr_size.y;
+	std::vector<float> compute_data(collection_size);
+	glGetTexImage(GL_TEXTURE_2D, 0, GL_RED, GL_FLOAT, compute_data.data());
+	debug_log("%f", compute_data[1]);
+	delete[] data;
   AnimationLerpedIndex index = animationPlayer.get_motion_matching() ? animationPlayer.get_motion_matching()->get_index() : animationPlayer.get_index();
 
   if (!index)

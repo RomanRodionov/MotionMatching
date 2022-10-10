@@ -255,9 +255,14 @@ ComputeShader::ComputeShader(const std::string &shader_name, GLuint shader_progr
   }
 }
 
-void ComputeShader::dispatch(vec2 work_groups) const
+void ComputeShader::dispatch(vec2i work_groups) const
 {
   glDispatchCompute(work_groups.x, work_groups.y, 1);
+}
+
+void ComputeShader::wait() const
+{
+  glMemoryBarrier(GL_ALL_BARRIER_BITS);
 }
 
 ComputeShader get_compute_shader(const std::string &shader_name, bool with_log)
