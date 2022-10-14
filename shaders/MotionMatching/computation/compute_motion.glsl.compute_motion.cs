@@ -1,6 +1,8 @@
-#shader compute_motion
+#version 450
+#define CS 1
 
-#compute_shader
+
+
 
 layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
 layout(r32f, binding = 0) uniform image2D out_tex;
@@ -12,7 +14,7 @@ void main()
 {
     uint step = 512;
     uint left_border = (gl_GlobalInvocationID.x - gl_LocalInvocationID.x) * 2;
-    uint base_idx = left_border + gl_LocalInvocationID.x;
+    uint base_idx = left_border + gl_LocalInvocationID.x
     if (base_idx < arr_size) 
     {
         values[gl_LocalInvocationID.x] = imageLoad( out_tex, ivec2(base_idx, gl_GlobalInvocationID.y) ).r;
@@ -30,10 +32,9 @@ void main()
         if ((gl_LocalInvocationID.x < step) && (base_idx + step < arr_size)) 
         {
             float val1 = values[gl_LocalInvocationID.x];
-            float val2 = values[gl_LocalInvocationID.x + step];
+            float val2 = values[gl_LocalInvocationID.x + step]
             if (val2 < val1) values[gl_LocalInvocationID.x] = val2;
         }
-        step /= 2;
         memoryBarrierShared();
         barrier();
     }

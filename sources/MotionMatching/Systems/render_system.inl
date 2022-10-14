@@ -7,7 +7,7 @@
 #include <render/debug_arrow.h>
 #include <render/global_uniform.h>
 #include "Animation/settings.h"
-  
+
 SYSTEM(stage=render;scene=game, editor) process_animation(
   const Asset<Mesh> &mesh,
   const AnimationPlayer &animationPlayer,
@@ -46,27 +46,42 @@ SYSTEM(stage=render;scene=game, editor) process_animation(
       draw_arrow(t, p, boneOffsets[i], vec3(0,0.8f,0), width);
     }
   }
-  glm::uvec2 arr_size = {16, 1};
-  glm::uvec2 dispatch_size = {1, 1};
+  // parallel reduction for finding the minimum value in an array of positive floats
+  int group_size = 512;
+  glm::uvec2 arr_size = {35, 1};
   GLfloat *data = new GLfloat[arr_size.x * arr_size.y];
 	for (uint i = 0; i < arr_size.x; ++i) {
 		for (uint j = 0; j < arr_size.y; ++j) {
 			data[i * arr_size.y + j] = i * arr_size.y + j;
 		}
   }
-  get_compute_shader("compute_motion").use();
-  get_compute_shader("compute_motion").set_image_texf(data, arr_size);
+  data[0] = 100;
+  data[33] = 0;
+  auto compute_shader = get_compute_shader("compute_motion");
+  compute_shader.use();
+  compute_shader.set_image_texf(data, arr_size);
   delete[] data;
-	get_compute_shader("compute_motion").dispatch(dispatch_size);
-  if (glGetError() == GL_INVALID_OPERATION) {
-    debug_error("GL got second error");
+  compute_shader.set_int("arr_size", arr_size[0]);
+  uint dsize = arr_size.x;
+  if (dsize % 2 > 0) dsize++;
+  dsize /= 2;
+  if (dsize % group_size > 0) {
+    dsize = dsize / group_size + 1;
   }
-	get_compute_shader("compute_motion").wait();
+  else
+  {
+    dsize = dsize / group_size;
+  }
+  glm::uvec2 dispatch_size = {dsize, 1};
+  if (arr_size.x % group_size > 0) dispatch_size.x++;
+  
+	compute_shader.dispatch(dispatch_size);
+	compute_shader.wait();
 	unsigned int collection_size = arr_size.x * arr_size.y;
 	std::vector<float> compute_data(collection_size);
-	get_compute_shader("compute_motion").get_image_texf(compute_data.data());
+	compute_shader.get_image_texf(compute_data.data());
 	debug_log("%f", compute_data[0]);
-	
+
   AnimationLerpedIndex index = animationPlayer.get_motion_matching() ? animationPlayer.get_motion_matching()->get_index() : animationPlayer.get_index();
 
   if (!index)
