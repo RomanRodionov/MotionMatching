@@ -46,23 +46,27 @@ SYSTEM(stage=render;scene=game, editor) process_animation(
       draw_arrow(t, p, boneOffsets[i], vec3(0,0.8f,0), width);
     }
   }
-  vec2i arr_size = {16, 16};
-  vec2i dispatch_size = {1, 1};
+  glm::uvec2 arr_size = {16, 1};
+  glm::uvec2 dispatch_size = {1, 1};
   GLfloat *data = new GLfloat[arr_size.x * arr_size.y];
-	for (int i = 0; i < arr_size.x; ++i) {
-		for (int j = 0; j < arr_size.y; ++j) {
+	for (uint i = 0; i < arr_size.x; ++i) {
+		for (uint j = 0; j < arr_size.y; ++j) {
 			data[i * arr_size.y + j] = i * arr_size.y + j;
 		}
   }
   get_compute_shader("compute_motion").use();
-  get_compute_shader("compute_motion").set_image_texture_f(data, arr_size);
+  get_compute_shader("compute_motion").set_image_texf(data, arr_size);
+  delete[] data;
 	get_compute_shader("compute_motion").dispatch(dispatch_size);
+  if (glGetError() == GL_INVALID_OPERATION) {
+    debug_error("GL got second error");
+  }
 	get_compute_shader("compute_motion").wait();
 	unsigned int collection_size = arr_size.x * arr_size.y;
 	std::vector<float> compute_data(collection_size);
-	glGetTexImage(GL_TEXTURE_2D, 0, GL_RED, GL_FLOAT, compute_data.data());
-	debug_log("%f", compute_data[1]);
-	delete[] data;
+	get_compute_shader("compute_motion").get_image_texf(compute_data.data());
+	debug_log("%f", compute_data[0]);
+	
   AnimationLerpedIndex index = animationPlayer.get_motion_matching() ? animationPlayer.get_motion_matching()->get_index() : animationPlayer.get_index();
 
   if (!index)

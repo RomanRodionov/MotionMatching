@@ -30,7 +30,6 @@ bool compile_shader(const string &shaderName, const vector<pair<GLuint, const ch
     {
       GLuint shaderProg = glCreateShader(codes.first);
       const GLchar * shaderCode = codes.second;
-      //debug_log("shader code:\n%s", shaderCode);
       glShaderSource(shaderProg, 1, &shaderCode, NULL);
       glCompileShader(shaderProg);
       glGetShaderiv(shaderProg, GL_COMPILE_STATUS, &success);
@@ -58,7 +57,7 @@ bool compile_shader(const string &shaderName, const vector<pair<GLuint, const ch
         debug_error("Shader programm (%s) linking failed!\n Log: %s", shaderName.c_str(), infoLog);
         return false;
     }
-
+    
     for (GLuint shaderProg: compiled_shaders)
       glDeleteShader(shaderProg);
   return true;
