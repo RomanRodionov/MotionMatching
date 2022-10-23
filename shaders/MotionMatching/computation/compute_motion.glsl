@@ -4,6 +4,10 @@
 
 layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
 layout(r32f, binding = 0) uniform image2D out_tex;
+layout(std430, binding = 0) buffer inout_values
+{
+    float data_SSBO[];
+};
 uniform int arr_size;
 
 shared float values[512];
@@ -15,7 +19,7 @@ void main()
     uint base_idx = left_border + gl_LocalInvocationID.x;
     if (base_idx < arr_size) 
     {
-        values[gl_LocalInvocationID.x] = imageLoad( out_tex, ivec2(base_idx, gl_GlobalInvocationID.y) ).r;
+        values[gl_LocalInvocationID.x] = data_SSBO[base_idx];
     }
     memoryBarrierShared();
     barrier();
@@ -37,6 +41,5 @@ void main()
         memoryBarrierShared();
         barrier();
     }
-    ivec2 pos = ivec2(base_idx, gl_GlobalInvocationID.y);
-    imageStore( out_tex, pos, vec4( values[gl_LocalInvocationID.x], 0.0, 0.0, 0.0 ) );
+    data_SSBO[base_idx] = values[gl_LocalInvocationID.x];
 }

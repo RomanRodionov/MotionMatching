@@ -13,6 +13,13 @@ AnimationIndex solve_motion_matching(
   MatchingScores &best_score,
   const MotionMatchingSettings &mmsettings);
 
+AnimationIndex solve_motion_matching_cs(
+  AnimationDataBasePtr dataBase,
+  const AnimationIndex &index,
+  const AnimationGoal &goal,
+  MatchingScores &best_score,
+  const MotionMatchingSettings &mmsettings);
+
 void get_motion_matching_statistic(
   AnimationDataBasePtr dataBase,
   const AnimationIndex &index,
@@ -156,12 +163,14 @@ SYSTEM(stage=act;before=animation_player_update) motion_matching_update(
         matching.bestScore = {0,0,0,0,0,0};
         AnimationIndex best_index;
 
-
         switch ((MotionMatchingSolverType)OptimisationSettings.solverType)
         {
         default: 
         case MotionMatchingSolverType::BruteForce :
           best_index = solve_motion_matching(dataBase, currentIndex, goal, matching.bestScore, mmsettings);
+          break;
+        case MotionMatchingSolverType::CSBruteForce :
+          best_index = solve_motion_matching_cs(dataBase, currentIndex, goal, matching.bestScore, mmsettings);
           break;
         case MotionMatchingSolverType::VPTree :
           best_index = solve_motion_matching_vp_tree(dataBase, goal, OptimisationSettings.vpTreeErrorTolerance);

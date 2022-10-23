@@ -9,6 +9,7 @@ enum class MotionMatchingSolverType
   VPTree,
   CoverTree,
   KDTree,
+  CSBruteForce,
   Count
 };
 
