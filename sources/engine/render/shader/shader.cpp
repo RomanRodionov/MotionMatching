@@ -232,6 +232,32 @@ void save_precompiled_shaders(vector<PrecompiledShader> &shaders)
   }
 }
 
+uint create_ssbo(uint binding)
+{
+	uint ssbo = 0;
+	glGenBuffers(1, &ssbo);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, binding, ssbo);
+	return ssbo;
+}
+void store_ssbo(uint ssbo, void *data, uint size)
+{
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo);
+	glBufferData(GL_SHADER_STORAGE_BUFFER, size, data, GL_DYNAMIC_READ);
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0); // unbind
+}
+void update_ssbo(uint ssbo, void *data, uint size, uint offset)
+{
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo);
+	glBufferSubData(GL_SHADER_STORAGE_BUFFER, offset, size, data);
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0); // unbind
+}
+void retrieve_ssbo(uint ssbo, void *data, uint size)
+{
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo);
+	glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, size, data);
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0); // unbind
+}
+
 static ComputeShader badComputeShader(-1);
 
 void ComputeShader::dispatch(glm::uvec2 work_groups) const
