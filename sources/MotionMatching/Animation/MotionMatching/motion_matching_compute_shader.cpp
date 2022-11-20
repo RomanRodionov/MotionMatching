@@ -21,36 +21,31 @@ struct FeatureCell
   vec3 points[(uint)AnimationTrajectory::PathLength];
   vec3 pointsVelocity[(uint)AnimationTrajectory::PathLength];
   float angularVelocity[(uint)AnimationTrajectory::PathLength];
-  uint clipIdx;
+  float pathMatchingWeight;
+  uint64_t tag;
+  //uint padding[];
 };
 
-struct ClipInfo
+struct GoalFeature
 {
-  Tag tag;
-  uint offset;
+  vec3 nodes[(uint)AnimationFeaturesNode::Count];
+  vec3 nodesVelocity[(uint)AnimationFeaturesNode::Count];
+  vec3 points[(uint)AnimationTrajectory::PathLength];
+  vec3 pointsVelocity[(uint)AnimationTrajectory::PathLength];
+  float angularVelocity[(uint)AnimationTrajectory::PathLength];
+  uint64_t tag;
+  uint padding[1];
 };
 
-struct SettingsCell
+void store_database(AnimationDataBasePtr dataBase, const MotionMatchingSettings &mmsettings, uint feature_ssbo)
 {
-  float nodeWeights[(uint)AnimationFeaturesNode::Count];
-  float velocitiesWeights[(uint)AnimationFeaturesNode::Count];
-};
-
-void store_database(AnimationDataBasePtr dataBase, const MotionMatchingSettings &mmsettings, uint feature_ssbo, uint clip_ssbo)
-{
-  SettingsCell settings;
-  for (uint node = 0; node < (uint)AnimationFeaturesNode::Count; node++) 
-  {
-    settings.nodeWeights[node] = mmsettings.nodeWeights[node];
-    settings.velocitiesWeights[node] = mmsettings.velocitiesWeights[node];
-  }
+  float poseWeight = mmsettings.realism * mmsettings.poseMatchingWeight;
+  float velocityWeight = mmsettings.realism * mmsettings.velocityMatchingWeight;
   std::vector<FeatureCell> featureData;
-  std::vector<ClipInfo> clipData;
   uint featuresCounter = 0;
   for (uint nextClip = 0; nextClip < dataBase->clips.size(); nextClip++)
   {
     const AnimationClip &clip = dataBase->clips[nextClip];
-    clipData.push_back({clip.tags.tags, featuresCounter});
     featuresCounter += clip.duration;
     for (uint nextCadr = 0, n = clip.duration; nextCadr < n; nextCadr++)
     {
@@ -58,22 +53,47 @@ void store_database(AnimationDataBasePtr dataBase, const MotionMatchingSettings 
       FeatureCell nextFeatureCell;
       for (uint node = 0; node < (uint)AnimationFeaturesNode::Count; node++)
       {
-        nextFeatureCell.nodes[node] = frame.features.nodes[node];
-        nextFeatureCell.nodesVelocity[node] = frame.features.nodesVelocity[node];
+        nextFeatureCell.nodes[node] = frame.features.nodes[node] * float(mmsettings.nodeWeights[node]) * poseWeight;
+        if (mmsettings.velocityMatching)
+          nextFeatureCell.nodesVelocity[node] = frame.features.nodesVelocity[node] * float(mmsettings.velocitiesWeights[node]) * velocityWeight;
+        else
+          nextFeatureCell.nodesVelocity[node] = glm::vec3(0, 0, 0);
       }
       for (uint point = 0; point < (uint)AnimationTrajectory::PathLength; point++)
       {
         nextFeatureCell.points[point] = frame.trajectory.trajectory[point].point;
-        nextFeatureCell.pointsVelocity[point] = frame.trajectory.trajectory[point].velocity;
-        nextFeatureCell.angularVelocity[point] = frame.trajectory.trajectory[point].angularVelocity;
+        nextFeatureCell.pointsVelocity[point] = frame.trajectory.trajectory[point].velocity * mmsettings.goalVelocityWeight;
+        nextFeatureCell.angularVelocity[point] = frame.trajectory.trajectory[point].angularVelocity * mmsettings.goalAngularVelocityWeight;
       }
-      nextFeatureCell.clipIdx = nextClip;
+      nextFeatureCell.pathMatchingWeight = mmsettings.goalPathMatchingWeight;
+      nextFeatureCell.tag = clip.tags.tags;
       featureData.push_back(nextFeatureCell);
     }
   }
   store_ssbo(feature_ssbo, featureData.data(), sizeof(FeatureCell) * featuresCounter);
-  store_ssbo(clip_ssbo, &settings, sizeof(settings) + sizeof(ClipInfo) * dataBase->clips.size());
-  update_ssbo(clip_ssbo, clipData.data(), sizeof(settings) + sizeof(ClipInfo) * dataBase->clips.size(), sizeof(settings));
+}
+
+void store_goal_feature(const AnimationGoal& goal, const MotionMatchingSettings &mmsettings, uint feature_ssbo)
+{
+  float poseWeight = mmsettings.realism * mmsettings.poseMatchingWeight;
+  float velocityWeight = mmsettings.realism * mmsettings.velocityMatchingWeight;
+  GoalFeature goal_feature;
+  for (uint node = 0; node < (uint)AnimationFeaturesNode::Count; node++)
+  {
+    goal_feature.nodes[node] = goal.feature.features.nodes[node] * float(mmsettings.nodeWeights[node]) * poseWeight;
+    if (mmsettings.velocityMatching)
+      goal_feature.nodesVelocity[node] = goal.feature.features.nodesVelocity[node] * float(mmsettings.velocitiesWeights[node]) * velocityWeight;
+    else
+      goal_feature.nodesVelocity[node] = glm::vec3(0, 0, 0);
+  }
+  for (uint point = 0; point < (uint)AnimationTrajectory::PathLength; point++)
+  {
+    goal_feature.points[point] = goal.feature.trajectory.trajectory[point].point;
+    goal_feature.pointsVelocity[point] = goal.feature.trajectory.trajectory[point].velocity * mmsettings.goalVelocityWeight;
+    goal_feature.angularVelocity[point] = goal.feature.trajectory.trajectory[point].angularVelocity * mmsettings.goalAngularVelocityWeight;
+  }
+  goal_feature.tag = goal.tags.tags;
+  store_ssbo(feature_ssbo, &goal_feature, sizeof(GoalFeature));
 }
 
 AnimationIndex solve_motion_matching_cs(
@@ -90,14 +110,14 @@ AnimationIndex solve_motion_matching_cs(
 
   // temporarily here, then I will take it somewhere \/
   static uint feature_ssbo = 0;
-  static uint clip_ssbo = 0;
+  static uint goal_feature_ssbo = 0;
   static bool database_stored = false;
 
   if (!database_stored) 
   {
     feature_ssbo = create_ssbo(1);
-    clip_ssbo = create_ssbo(2);
-    store_database(dataBase, mmsettings, feature_ssbo, clip_ssbo);
+    goal_feature_ssbo = create_ssbo(2);
+    store_database(dataBase, mmsettings, feature_ssbo);
     database_stored = true;
   }
   //-------------------------------------------------/
@@ -106,6 +126,7 @@ AnimationIndex solve_motion_matching_cs(
   //#pragma omp declare reduction(mm_min: ArgMin: omp_out=mm_min2(omp_out, omp_in))\
   //  initializer(omp_priv={INFINITY, 0, 0,{0,0,0,0,0,0}})
   //#pragma omp parallel for reduction(mm_min:best)
+  store_goal_feature(goal, mmsettings, goal_feature_ssbo);
   for (uint nextClip = 0; nextClip < dataBase->clips.size(); nextClip++)
   {
     const AnimationClip &clip = dataBase->clips[nextClip];

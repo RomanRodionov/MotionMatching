@@ -2,12 +2,31 @@
 
 #compute_shader
 
+const uint nodesCount = 4;
+const uint pathLength = 3;
+
+struct FeatureCell
+{
+  vec3 nodes[nodesCount];
+  vec3 nodesVelocity[nodesCount];
+  vec3 points[pathLength];
+  vec3 pointsVelocity[pathLength];
+  float angularVelocity[pathLength];
+  float pathMatchingWeight;
+  uint tag[2];
+  //uint padding[];
+};
+
 layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
-layout(r32f, binding = 0) uniform image2D out_tex;
 layout(std430, binding = 0) buffer inout_values
 {
     float data_SSBO[];
 };
+layout(std430, binding = 1) buffer mm_data
+{
+    FeatureCell cells[];
+};
+
 uniform int arr_size;
 
 shared float values[512];
@@ -25,7 +44,7 @@ void main()
     barrier();
     if (base_idx + step < arr_size) 
     {
-        float value = imageLoad( out_tex, ivec2( (left_border + gl_LocalInvocationID.x, gl_GlobalInvocationID.y) ) ).r;
+        float value = data_SSBO[base_idx + step];
         if (value < values[gl_LocalInvocationID.x]) values[gl_LocalInvocationID.x] = value;
     }
     memoryBarrierShared();
