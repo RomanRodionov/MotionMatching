@@ -21,12 +21,12 @@ struct FeatureCell
   vec3 points[(uint)AnimationTrajectory::PathLength];
   vec3 pointsVelocity[(uint)AnimationTrajectory::PathLength];
   float angularVelocity[(uint)AnimationTrajectory::PathLength];
-  float pathMatchingWeight;
+  float goalPathMatchingWeight;
   uint64_t tag;
   //uint padding[];
 };
 
-struct GoalFeature
+struct InOutBuffer
 {
   vec3 nodes[(uint)AnimationFeaturesNode::Count];
   vec3 nodesVelocity[(uint)AnimationFeaturesNode::Count];
@@ -34,7 +34,9 @@ struct GoalFeature
   vec3 pointsVelocity[(uint)AnimationTrajectory::PathLength];
   float angularVelocity[(uint)AnimationTrajectory::PathLength];
   uint64_t tag;
-  uint padding[1];
+  float pose, goal_tag, goal_path, trajectory_v, trajectory_w;
+  float full_score;
+  uint padding[3];
 };
 
 void store_database(AnimationDataBasePtr dataBase, const MotionMatchingSettings &mmsettings, uint feature_ssbo)
@@ -65,7 +67,7 @@ void store_database(AnimationDataBasePtr dataBase, const MotionMatchingSettings 
         nextFeatureCell.pointsVelocity[point] = frame.trajectory.trajectory[point].velocity * mmsettings.goalVelocityWeight;
         nextFeatureCell.angularVelocity[point] = frame.trajectory.trajectory[point].angularVelocity * mmsettings.goalAngularVelocityWeight;
       }
-      nextFeatureCell.pathMatchingWeight = mmsettings.goalPathMatchingWeight;
+      nextFeatureCell.goalPathMatchingWeight = mmsettings.goalPathMatchingWeight;
       nextFeatureCell.tag = clip.tags.tags;
       featureData.push_back(nextFeatureCell);
     }
@@ -77,7 +79,7 @@ void store_goal_feature(const AnimationGoal& goal, const MotionMatchingSettings 
 {
   float poseWeight = mmsettings.realism * mmsettings.poseMatchingWeight;
   float velocityWeight = mmsettings.realism * mmsettings.velocityMatchingWeight;
-  GoalFeature goal_feature;
+  InOutBuffer goal_feature;
   for (uint node = 0; node < (uint)AnimationFeaturesNode::Count; node++)
   {
     goal_feature.nodes[node] = goal.feature.features.nodes[node] * float(mmsettings.nodeWeights[node]) * poseWeight;
@@ -93,7 +95,13 @@ void store_goal_feature(const AnimationGoal& goal, const MotionMatchingSettings 
     goal_feature.angularVelocity[point] = goal.feature.trajectory.trajectory[point].angularVelocity * mmsettings.goalAngularVelocityWeight;
   }
   goal_feature.tag = goal.tags.tags;
-  store_ssbo(feature_ssbo, &goal_feature, sizeof(GoalFeature));
+  goal_feature.pose = 0;
+  goal_feature.goal_tag = 0;
+  goal_feature.goal_path = 0;
+  goal_feature.trajectory_v = 0;
+  goal_feature.trajectory_w = 0;
+  goal_feature.full_score = 0;
+  store_ssbo(feature_ssbo, &goal_feature, sizeof(InOutBuffer));
 }
 
 AnimationIndex solve_motion_matching_cs(
