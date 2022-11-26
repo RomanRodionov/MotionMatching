@@ -39,12 +39,20 @@ struct InOutBuffer
   uint padding[3];
 };
 
-void store_database(AnimationDataBasePtr dataBase, const MotionMatchingSettings &mmsettings, uint feature_ssbo)
+struct ShaderMatchingScores
+{
+  float pose, goal_tag, goal_path, trajectory_v, trajectory_w;
+  float full_score;
+  uint padding[2];
+};
+
+void store_database(AnimationDataBasePtr dataBase, const MotionMatchingSettings &mmsettings, uint feature_ssbo, uint &size)
 {
   float poseWeight = mmsettings.realism * mmsettings.poseMatchingWeight;
   float velocityWeight = mmsettings.realism * mmsettings.velocityMatchingWeight;
   std::vector<FeatureCell> featureData;
   uint featuresCounter = 0;
+  size = 0;
   for (uint nextClip = 0; nextClip < dataBase->clips.size(); nextClip++)
   {
     const AnimationClip &clip = dataBase->clips[nextClip];
@@ -70,6 +78,7 @@ void store_database(AnimationDataBasePtr dataBase, const MotionMatchingSettings 
       nextFeatureCell.goalPathMatchingWeight = mmsettings.goalPathMatchingWeight;
       nextFeatureCell.tag = clip.tags.tags;
       featureData.push_back(nextFeatureCell);
+      size++;
     }
   }
   store_ssbo(feature_ssbo, featureData.data(), sizeof(FeatureCell) * featuresCounter);
@@ -119,28 +128,62 @@ AnimationIndex solve_motion_matching_cs(
   // temporarily here, then I will take it somewhere \/
   static uint feature_ssbo = 0;
   static uint goal_feature_ssbo = 0;
+  static uint result_ssbo = 0;
+  static uint dataSize;
   static bool database_stored = false;
+  static ShaderMatchingScores *scores;
 
   if (!database_stored) 
   {
     feature_ssbo = create_ssbo(1);
     goal_feature_ssbo = create_ssbo(2);
-    store_database(dataBase, mmsettings, feature_ssbo);
+    result_ssbo = create_ssbo(3);
+    store_database(dataBase, mmsettings, feature_ssbo, dataSize);
+
+    scores = new ShaderMatchingScores[dataSize];
+    store_ssbo(result_ssbo, scores, dataSize * sizeof(ShaderMatchingScores));
+
     database_stored = true;
   }
   //-------------------------------------------------/
-  
-  ArgMin best = {INFINITY, curClip, curCadr, best_score};
-  //#pragma omp declare reduction(mm_min: ArgMin: omp_out=mm_min2(omp_out, omp_in))\
-  //  initializer(omp_priv={INFINITY, 0, 0,{0,0,0,0,0,0}})
-  //#pragma omp parallel for reduction(mm_min:best)
+
   store_goal_feature(goal, mmsettings, goal_feature_ssbo);
+
+  uint group_size = 256;
+   
+  auto compute_shader = get_compute_shader("compute_motion");
+  compute_shader.use();
+
+  glm::uvec2 dispatch_size = {8, 1};
+  
+  uint invocations = dispatch_size.x * dispatch_size.y * group_size;
+
+  uint iterations = dataSize / invocations;
+  if (dataSize % invocations > 0) iterations++;
+
+  compute_shader.set_int("arr_size", dataSize);
+  compute_shader.set_int("iterations", iterations);
+
+	compute_shader.dispatch(dispatch_size);
+  auto sync = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+  glWaitSync(sync, 0, 100000000000);
+	compute_shader.wait();
+  
+	retrieve_ssbo(result_ssbo, scores, dataSize * sizeof(ShaderMatchingScores));
+
+  ArgMin best = {INFINITY, curClip, curCadr, best_score};
+  
+  uint idx = 0;
+
   for (uint nextClip = 0; nextClip < dataBase->clips.size(); nextClip++)
   {
     const AnimationClip &clip = dataBase->clips[nextClip];
 
     if (!has_goal_tags(goal.tags, clip.tags))
+    { 
+      idx += clip.duration;
       continue;
+    }
     for (uint nextCadr = 0, n = clip.duration; nextCadr < n; nextCadr++)
     {
       MatchingScores score = get_score(clip.features[nextCadr], goal.feature, mmsettings);
@@ -148,9 +191,12 @@ AnimationIndex solve_motion_matching_cs(
       float matching = score.full_score;
       ArgMin cur = {matching, nextClip, nextCadr, score};
       best = mm_min2(best, cur);
+      debug_log("%f %f", scores[idx].full_score, cur.score.full_score);
+      idx++;
     }
   }
-  //
+
+  /*
   // parallel reduction for finding the minimum value in an array of positive floats
   int group_size = 512;
   uint arr_size = 256;
@@ -186,7 +232,7 @@ AnimationIndex solve_motion_matching_cs(
 	std::vector<float> compute_data(collection_size);
 	retrieve_ssbo(ssbo, compute_data.data(), collection_size * sizeof(float));
 	debug_log("%f", compute_data[0]);
-  //
+  */
   best_score = best.score;
   return AnimationIndex(dataBase, best.clip, best.frame);
 }

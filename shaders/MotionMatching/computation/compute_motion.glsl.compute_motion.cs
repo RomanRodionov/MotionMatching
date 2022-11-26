@@ -37,7 +37,14 @@ struct InOutBuffer
   uint padding[3];
 };
 
-layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
+struct BufferMatchingScores
+{
+  float pose, goal_tag, goal_path, trajectory_v, trajectory_w;
+  float full_score;
+  uint padding[2];
+};
+
+layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 layout(std430, binding = 0) buffer inout_values
 {
     float data_SSBO[];
@@ -48,12 +55,16 @@ layout(std430, binding = 1) buffer mm_data
 };
 layout(std430, binding = 2) buffer goal_data
 {
-    GoalFeature goal;
+    InOutBuffer goal;
+};
+layout(std430, binding = 3) buffer result_data
+{
+    BufferMatchingScores results[];
 };
 
-uniform int arr_size;
 
-shared float values[512];
+uniform uint arr_size;
+uniform uint iterations;
 
 struct MatchingScores
 {
@@ -109,16 +120,30 @@ float trajectory_w_norma(in FeatureCell feature, in InOutBuffer goal)
   return path_norma;
 }
 
-MatchingScores get_score(in FeatureCell feature, in InOutBuffer goal)
+BufferMatchingScores get_score(in FeatureCell feature, in InOutBuffer goal)
 {
-  MatchingScores score = {0, 0, 0, 0, 0, 0};
+  BufferMatchingScores score;
   score.pose = pose_matching_norma(feature, goal);
   score.goal_path = goal_path_norma(feature, goal) * feature.goalPathMatchingWeight;
-  score.trajectory_v = trajectory_v_norma(feature, goal);
+  score.trajectory_v = 1;//trajectory_v_norma(feature, goal);
   score.trajectory_w = trajectory_w_norma(feature, goal);
   score.full_score = score.pose + score.goal_path + score.trajectory_v + score.trajectory_w;
   return score;
 }
+
+void main()
+{
+  for (uint i = 0; i < iterations && gl_GlobalInvocationID.x * iterations + i < arr_size; i++)
+  {
+    results[gl_GlobalInvocationID.x * iterations + i] = get_score(feature[gl_GlobalInvocationID.x * iterations + i], goal);
+  }
+  results[gl_GlobalInvocationID].trajectory_v = 1;
+  memoryBarrierShared();
+  barrier();
+}
+
+/*
+shared float values[512];
 
 void main()
 {
@@ -151,3 +176,4 @@ void main()
   }
   data_SSBO[base_idx] = values[gl_LocalInvocationID.x];
 }
+*/
