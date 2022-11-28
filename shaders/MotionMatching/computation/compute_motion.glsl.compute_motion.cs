@@ -14,10 +14,10 @@ struct Tag
 
 struct FeatureCell
 {
-  vec3 nodes[nodesCount];
-  vec3 nodesVelocity[nodesCount];
-  vec3 points[pathLength];
-  vec3 pointsVelocity[pathLength];
+  vec4 nodes[nodesCount];
+  vec4 nodesVelocity[nodesCount];
+  vec4 points[pathLength];
+  vec4 pointsVelocity[pathLength];
   float angularVelocity[pathLength];
   float goalPathMatchingWeight;
   Tag tag;
@@ -26,15 +26,16 @@ struct FeatureCell
 
 struct InOutBuffer
 {
-  vec3 nodes[nodesCount];
-  vec3 nodesVelocity[nodesCount];
-  vec3 points[pathLength];
-  vec3 pointsVelocity[pathLength];
+  vec4 nodes[nodesCount];
+  vec4 nodesVelocity[nodesCount];
+  vec4 points[pathLength];
+  vec4 pointsVelocity[pathLength];
   float angularVelocity[pathLength];
+  /*
   Tag tag;
   float pose, goal_tag, goal_path, trajectory_v, trajectory_w;
   float full_score;
-  uint padding[3];
+  */
 };
 
 struct BufferMatchingScores
@@ -45,26 +46,27 @@ struct BufferMatchingScores
 };
 
 layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+/*
 layout(std430, binding = 0) buffer inout_values
 {
     float data_SSBO[];
 };
-layout(std430, binding = 1) buffer mm_data
+*/
+layout(std430, binding = 0) buffer mm_data
 {
     FeatureCell feature[];
 };
-layout(std430, binding = 2) buffer goal_data
-{
-    InOutBuffer goal;
-};
-layout(std430, binding = 3) buffer result_data
+layout(std430, binding = 1) buffer result_data
 {
     BufferMatchingScores results[];
 };
+layout (std140, binding = 2) uniform DataBlock
+{
+    InOutBuffer goal_data;
+};  
 
-
-uniform uint arr_size;
-uniform uint iterations;
+uniform int arr_size;
+uniform int iterations;
 
 struct MatchingScores
 {
@@ -125,28 +127,23 @@ BufferMatchingScores get_score(in FeatureCell feature, in InOutBuffer goal)
   BufferMatchingScores score;
   score.pose = pose_matching_norma(feature, goal);
   score.goal_path = goal_path_norma(feature, goal) * feature.goalPathMatchingWeight;
-  score.trajectory_v = 1;//trajectory_v_norma(feature, goal);
+  score.trajectory_v = trajectory_v_norma(feature, goal);
   score.trajectory_w = trajectory_w_norma(feature, goal);
   score.full_score = score.pose + score.goal_path + score.trajectory_v + score.trajectory_w;
   return score;
 }
 
-void main()
-{
-  for (uint i = 0; i < iterations && gl_GlobalInvocationID.x * iterations + i < arr_size; i++)
-  {
-    results[gl_GlobalInvocationID.x * iterations + i] = get_score(feature[gl_GlobalInvocationID.x * iterations + i], goal);
-  }
-  results[gl_GlobalInvocationID].trajectory_v = 1;
-  memoryBarrierShared();
-  barrier();
-}
-
-/*
 shared float values[512];
 
 void main()
 {
+  for (uint i = 0; (i < iterations) && (gl_GlobalInvocationID.x * iterations + i < arr_size); i++)
+  {
+    results[gl_GlobalInvocationID.x * iterations + i].full_score = get_score(feature[gl_GlobalInvocationID.x * iterations + i], goal);
+  }
+  memoryBarrierShared();
+  barrier();
+  /*
   uint step = 512;
   uint left_border = (gl_GlobalInvocationID.x - gl_LocalInvocationID.x) * 2;
   uint base_idx = left_border + gl_LocalInvocationID.x;
@@ -175,5 +172,5 @@ void main()
       barrier();
   }
   data_SSBO[base_idx] = values[gl_LocalInvocationID.x];
+  */
 }
-*/

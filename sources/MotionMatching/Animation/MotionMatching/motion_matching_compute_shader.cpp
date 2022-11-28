@@ -16,10 +16,10 @@ static ArgMin mm_min2(const ArgMin &a, const ArgMin &b)
 
 struct FeatureCell
 {
-  vec3 nodes[(uint)AnimationFeaturesNode::Count];
-  vec3 nodesVelocity[(uint)AnimationFeaturesNode::Count];
-  vec3 points[(uint)AnimationTrajectory::PathLength];
-  vec3 pointsVelocity[(uint)AnimationTrajectory::PathLength];
+  vec4 nodes[(uint)AnimationFeaturesNode::Count];
+  vec4 nodesVelocity[(uint)AnimationFeaturesNode::Count];
+  vec4 points[(uint)AnimationTrajectory::PathLength];
+  vec4 pointsVelocity[(uint)AnimationTrajectory::PathLength];
   float angularVelocity[(uint)AnimationTrajectory::PathLength];
   float goalPathMatchingWeight;
   uint64_t tag;
@@ -28,15 +28,16 @@ struct FeatureCell
 
 struct InOutBuffer
 {
-  vec3 nodes[(uint)AnimationFeaturesNode::Count];
-  vec3 nodesVelocity[(uint)AnimationFeaturesNode::Count];
-  vec3 points[(uint)AnimationTrajectory::PathLength];
-  vec3 pointsVelocity[(uint)AnimationTrajectory::PathLength];
+  vec4 nodes[(uint)AnimationFeaturesNode::Count];
+  vec4 nodesVelocity[(uint)AnimationFeaturesNode::Count];
+  vec4 points[(uint)AnimationTrajectory::PathLength];
+  vec4 pointsVelocity[(uint)AnimationTrajectory::PathLength];
   float angularVelocity[(uint)AnimationTrajectory::PathLength];
+  /*
   uint64_t tag;
   float pose, goal_tag, goal_path, trajectory_v, trajectory_w;
   float full_score;
-  uint padding[3];
+  */
 };
 
 struct ShaderMatchingScores
@@ -46,7 +47,7 @@ struct ShaderMatchingScores
   uint padding[2];
 };
 
-void store_database(AnimationDataBasePtr dataBase, const MotionMatchingSettings &mmsettings, uint feature_ssbo, uint &size)
+void store_database(AnimationDataBasePtr dataBase, const MotionMatchingSettings &mmsettings, uint feature_ssbo, int &size)
 {
   float poseWeight = mmsettings.realism * mmsettings.poseMatchingWeight;
   float velocityWeight = mmsettings.realism * mmsettings.velocityMatchingWeight;
@@ -63,16 +64,16 @@ void store_database(AnimationDataBasePtr dataBase, const MotionMatchingSettings 
       FeatureCell nextFeatureCell;
       for (uint node = 0; node < (uint)AnimationFeaturesNode::Count; node++)
       {
-        nextFeatureCell.nodes[node] = frame.features.nodes[node] * float(mmsettings.nodeWeights[node]) * poseWeight;
+        nextFeatureCell.nodes[node] = vec4(frame.features.nodes[node] * float(mmsettings.nodeWeights[node]) * poseWeight, 0);
         if (mmsettings.velocityMatching)
-          nextFeatureCell.nodesVelocity[node] = frame.features.nodesVelocity[node] * float(mmsettings.velocitiesWeights[node]) * velocityWeight;
+          nextFeatureCell.nodesVelocity[node] = vec4(frame.features.nodesVelocity[node] * float(mmsettings.velocitiesWeights[node]) * velocityWeight, 0);
         else
-          nextFeatureCell.nodesVelocity[node] = glm::vec3(0, 0, 0);
+          nextFeatureCell.nodesVelocity[node] = vec4(0, 0, 0, 0);
       }
       for (uint point = 0; point < (uint)AnimationTrajectory::PathLength; point++)
       {
-        nextFeatureCell.points[point] = frame.trajectory.trajectory[point].point;
-        nextFeatureCell.pointsVelocity[point] = frame.trajectory.trajectory[point].velocity * mmsettings.goalVelocityWeight;
+        nextFeatureCell.points[point] = vec4(frame.trajectory.trajectory[point].point, 0);
+        nextFeatureCell.pointsVelocity[point] = vec4(frame.trajectory.trajectory[point].velocity * mmsettings.goalVelocityWeight, 0);
         nextFeatureCell.angularVelocity[point] = frame.trajectory.trajectory[point].angularVelocity * mmsettings.goalAngularVelocityWeight;
       }
       nextFeatureCell.goalPathMatchingWeight = mmsettings.goalPathMatchingWeight;
@@ -84,25 +85,26 @@ void store_database(AnimationDataBasePtr dataBase, const MotionMatchingSettings 
   store_ssbo(feature_ssbo, featureData.data(), sizeof(FeatureCell) * featuresCounter);
 }
 
-void store_goal_feature(const AnimationGoal& goal, const MotionMatchingSettings &mmsettings, uint feature_ssbo)
+void store_goal_feature(const AnimationGoal& goal, const MotionMatchingSettings &mmsettings, uint uboBlock)
 {
   float poseWeight = mmsettings.realism * mmsettings.poseMatchingWeight;
   float velocityWeight = mmsettings.realism * mmsettings.velocityMatchingWeight;
   InOutBuffer goal_feature;
   for (uint node = 0; node < (uint)AnimationFeaturesNode::Count; node++)
   {
-    goal_feature.nodes[node] = goal.feature.features.nodes[node] * float(mmsettings.nodeWeights[node]) * poseWeight;
+    goal_feature.nodes[node] = vec4(goal.feature.features.nodes[node] * float(mmsettings.nodeWeights[node]) * poseWeight, 0);
     if (mmsettings.velocityMatching)
-      goal_feature.nodesVelocity[node] = goal.feature.features.nodesVelocity[node] * float(mmsettings.velocitiesWeights[node]) * velocityWeight;
+      goal_feature.nodesVelocity[node] = vec4(goal.feature.features.nodesVelocity[node] * float(mmsettings.velocitiesWeights[node]) * velocityWeight, 0);
     else
-      goal_feature.nodesVelocity[node] = glm::vec3(0, 0, 0);
+      goal_feature.nodesVelocity[node] = vec4(0, 0, 0, 0);
   }
   for (uint point = 0; point < (uint)AnimationTrajectory::PathLength; point++)
   {
-    goal_feature.points[point] = goal.feature.trajectory.trajectory[point].point;
-    goal_feature.pointsVelocity[point] = goal.feature.trajectory.trajectory[point].velocity * mmsettings.goalVelocityWeight;
+    goal_feature.points[point] = vec4(goal.feature.trajectory.trajectory[point].point, 0);
+    goal_feature.pointsVelocity[point] = vec4(goal.feature.trajectory.trajectory[point].velocity * mmsettings.goalVelocityWeight, 0);
     goal_feature.angularVelocity[point] = goal.feature.trajectory.trajectory[point].angularVelocity * mmsettings.goalAngularVelocityWeight;
   }
+  /*
   goal_feature.tag = goal.tags.tags;
   goal_feature.pose = 0;
   goal_feature.goal_tag = 0;
@@ -110,7 +112,13 @@ void store_goal_feature(const AnimationGoal& goal, const MotionMatchingSettings 
   goal_feature.trajectory_v = 0;
   goal_feature.trajectory_w = 0;
   goal_feature.full_score = 0;
-  store_ssbo(feature_ssbo, &goal_feature, sizeof(InOutBuffer));
+  */
+  glBindBuffer(GL_UNIFORM_BUFFER, uboBlock);
+  glBindBufferBase(GL_UNIFORM_BUFFER, 2, uboBlock);
+  glBufferData(GL_UNIFORM_BUFFER, 224, &goal_feature, GL_STREAM_DRAW);
+  glBindBuffer(GL_UNIFORM_BUFFER, 0);
+ 
+  //debug_log("%f", goal_feature.angularVelocity[0]);
 }
 
 AnimationIndex solve_motion_matching_cs(
@@ -127,50 +135,52 @@ AnimationIndex solve_motion_matching_cs(
 
   // temporarily here, then I will take it somewhere \/
   static uint feature_ssbo = 0;
-  static uint goal_feature_ssbo = 0;
   static uint result_ssbo = 0;
-  static uint dataSize;
+  static int dataSize;
   static bool database_stored = false;
   static ShaderMatchingScores *scores;
+  static uint uboBlock;
 
   if (!database_stored) 
   {
-    feature_ssbo = create_ssbo(1);
-    goal_feature_ssbo = create_ssbo(2);
-    result_ssbo = create_ssbo(3);
+    feature_ssbo = create_ssbo(0);
+    result_ssbo = create_ssbo(1);
     store_database(dataBase, mmsettings, feature_ssbo, dataSize);
+    
+    glGenBuffers(1, &uboBlock);
+    glBindBufferBase(GL_UNIFORM_BUFFER, 2, uboBlock); 
 
     scores = new ShaderMatchingScores[dataSize];
-    store_ssbo(result_ssbo, scores, dataSize * sizeof(ShaderMatchingScores));
+    store_ssbo(result_ssbo, NULL, dataSize * sizeof(ShaderMatchingScores));
 
     database_stored = true;
   }
   //-------------------------------------------------/
 
-  store_goal_feature(goal, mmsettings, goal_feature_ssbo);
-
   uint group_size = 256;
-   
+  
+
   auto compute_shader = get_compute_shader("compute_motion");
   compute_shader.use();
+  store_goal_feature(goal, mmsettings, uboBlock);
 
   glm::uvec2 dispatch_size = {8, 1};
   
   uint invocations = dispatch_size.x * dispatch_size.y * group_size;
 
-  uint iterations = dataSize / invocations;
+  int iterations = dataSize / invocations;
   if (dataSize % invocations > 0) iterations++;
-
   compute_shader.set_int("arr_size", dataSize);
   compute_shader.set_int("iterations", iterations);
-
+  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, feature_ssbo);
+  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, result_ssbo);
+  glBindBufferBase(GL_UNIFORM_BUFFER, 2, uboBlock);
 	compute_shader.dispatch(dispatch_size);
   auto sync = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
-  glWaitSync(sync, 0, 100000000000);
+  glWaitSync(sync, 0, 1000000000);
 	compute_shader.wait();
+	retrieve_ssbo(result_ssbo, scores, dataSize * sizeof(ShaderMatchingScores), 1);
   
-	retrieve_ssbo(result_ssbo, scores, dataSize * sizeof(ShaderMatchingScores));
-
   ArgMin best = {INFINITY, curClip, curCadr, best_score};
   
   uint idx = 0;
@@ -191,14 +201,14 @@ AnimationIndex solve_motion_matching_cs(
       float matching = score.full_score;
       ArgMin cur = {matching, nextClip, nextCadr, score};
       best = mm_min2(best, cur);
-      debug_log("%f %f", scores[idx].full_score, cur.score.full_score);
+      if (idx % 100 == 0)
+          debug_log("%f %f", scores[idx].full_score, cur.score.full_score);
       idx++;
     }
   }
 
   /*
   // parallel reduction for finding the minimum value in an array of positive floats
-  int group_size = 512;
   uint arr_size = 256;
   static uint a = 0;
   GLfloat *data = new GLfloat[arr_size];
@@ -207,7 +217,6 @@ AnimationIndex solve_motion_matching_cs(
   }
   data[a % 256] = 15;
   a++;
-  auto compute_shader = get_compute_shader("compute_motion");
   compute_shader.use();
   uint ssbo = create_ssbo();
   store_ssbo(ssbo, data, arr_size * sizeof(float));
@@ -223,7 +232,7 @@ AnimationIndex solve_motion_matching_cs(
   {
     dsize = dsize / group_size;
   }
-  glm::uvec2 dispatch_size = {dsize, 1};
+  dispatch_size = {dsize, 1};
   if (arr_size % group_size > 0) dispatch_size.x++;
   
 	compute_shader.dispatch(dispatch_size);
