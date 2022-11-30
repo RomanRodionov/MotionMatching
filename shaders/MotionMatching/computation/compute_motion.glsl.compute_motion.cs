@@ -137,9 +137,9 @@ shared float values[512];
 
 void main()
 {
-  for (uint i = 0; (i < iterations) && (gl_GlobalInvocationID.x * iterations + i < arr_size); i++)
+  for (int i = 0; (i < iterations) && (gl_GlobalInvocationID.x * iterations + i < arr_size); i++)
   {
-    results[gl_GlobalInvocationID.x * iterations + i].full_score = get_score(feature[gl_GlobalInvocationID.x * iterations + i], goal);
+    results[gl_GlobalInvocationID.x * iterations + i].full_score = get_score(feature[0], goal_data);
   }
   memoryBarrierShared();
   barrier();

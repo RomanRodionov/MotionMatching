@@ -23,7 +23,7 @@ struct FeatureCell
   float angularVelocity[(uint)AnimationTrajectory::PathLength];
   float goalPathMatchingWeight;
   uint64_t tag;
-  //uint padding[];
+  uint padding[2];
 };
 
 struct InOutBuffer
@@ -184,6 +184,8 @@ AnimationIndex solve_motion_matching_cs(
   ArgMin best = {INFINITY, curClip, curCadr, best_score};
   
   uint idx = 0;
+  
+  
 
   for (uint nextClip = 0; nextClip < dataBase->clips.size(); nextClip++)
   {
@@ -202,7 +204,7 @@ AnimationIndex solve_motion_matching_cs(
       ArgMin cur = {matching, nextClip, nextCadr, score};
       best = mm_min2(best, cur);
       if (idx % 100 == 0)
-          debug_log("%f %f", scores[idx].full_score, cur.score.full_score);
+          debug_log("%f %f", scores[idx].goal_path, score.goal_path);
       idx++;
     }
   }

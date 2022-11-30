@@ -19,7 +19,7 @@ struct FeatureCell
   float angularVelocity[pathLength];
   float goalPathMatchingWeight;
   Tag tag;
-  //uint padding[];
+  uint padding[2];
 };
 
 struct InOutBuffer
@@ -131,13 +131,13 @@ BufferMatchingScores get_score(in FeatureCell feature, in InOutBuffer goal)
   return score;
 }
 
-shared float values[512];
+//shared float values[512];
 
 void main()
 {
   for (uint i = 0; (i < iterations) && (gl_GlobalInvocationID.x * iterations + i < arr_size); i++)
   {
-    results[gl_GlobalInvocationID.x * iterations + i].full_score = get_score(feature[gl_GlobalInvocationID.x * iterations + i], goal);
+    results[gl_GlobalInvocationID.x * iterations + i] = get_score(feature[gl_GlobalInvocationID.x * iterations + i], goal_data);
   }
   memoryBarrierShared();
   barrier();
