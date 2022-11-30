@@ -45,7 +45,7 @@ struct BufferMatchingScores
   uint padding[2];
 };
 
-layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
 /*
 layout(std430, binding = 0) buffer inout_values
 {

@@ -9,11 +9,6 @@ struct ArgMin
   MatchingScores score;
 };
 
-static ArgMin mm_min2(const ArgMin &a, const ArgMin &b)
-{
-  return a.value < b.value ? a : b; 
-}
-
 struct FeatureCell
 {
   vec4 nodes[(uint)AnimationFeaturesNode::Count];
@@ -23,11 +18,6 @@ struct FeatureCell
   vec4 angularVelocity;
   vec4 weights;
 };
-/*
-float goalPathMatchingWeight;
-  float realism;
-  uint padding[2];
-*/
 
 struct InOutBuffer
 {
@@ -36,19 +26,37 @@ struct InOutBuffer
   vec4 points[(uint)AnimationTrajectory::PathLength];
   vec4 pointsVelocity[(uint)AnimationTrajectory::PathLength];
   vec4 angularVelocity;
-  // padding[1];
 };
-  /*
-  uint64_t tag;
-  float pose, goal_tag, goal_path, trajectory_v, trajectory_w;
-  float full_score;
-  */
+
 struct ShaderMatchingScores
 {
   float pose, goal_tag, goal_path, trajectory_v, trajectory_w;
   float full_score;
   uint padding[2];
 };
+
+struct ShaderArgMin
+{
+  float value;
+  uint clip, frame;
+  ShaderMatchingScores score;
+};
+
+void mm_shader_min(ArgMin &a, const ShaderMatchingScores &b, uint clip, uint frame)
+{
+  if (b.full_score < a.value)
+  {
+    a.value = b.full_score;
+    a.clip = clip;
+    a.frame = frame;
+    a.score.full_score = b.full_score;
+    a.score.goal_path = b.goal_path;
+    a.score.pose = b.pose;
+    a.score.trajectory_v = b.trajectory_v;
+    a.score.trajectory_w = b.trajectory_w;
+  }
+
+}
 
 void store_database(AnimationDataBasePtr dataBase, const MotionMatchingSettings &mmsettings, uint feature_ssbo, int &size)
 {
@@ -106,23 +114,11 @@ void store_goal_feature(const AnimationGoal& goal, const MotionMatchingSettings 
     goal_feature.points[point] = vec4(goal.feature.trajectory.trajectory[point].point, 0);
     goal_feature.pointsVelocity[point] = vec4(goal.feature.trajectory.trajectory[point].velocity * mmsettings.goalVelocityWeight, 0);
     goal_feature.angularVelocity[point] = goal.feature.trajectory.trajectory[point].angularVelocity * mmsettings.goalAngularVelocityWeight;
-    debug_log("%f", goal_feature.angularVelocity[point]);
   }
-  /*
-  goal_feature.tag = goal.tags.tags;
-  goal_feature.pose = 0;
-  goal_feature.goal_tag = 0;
-  goal_feature.goal_path = 0;
-  goal_feature.trajectory_v = 0;
-  goal_feature.trajectory_w = 0;
-  goal_feature.full_score = 0;
-  */
   glBindBuffer(GL_UNIFORM_BUFFER, uboBlock);
   glBindBufferBase(GL_UNIFORM_BUFFER, 2, uboBlock);
   glBufferData(GL_UNIFORM_BUFFER, sizeof(InOutBuffer), &goal_feature, GL_STREAM_DRAW);
   glBindBuffer(GL_UNIFORM_BUFFER, 0);
- 
-  //debug_log("%d", sizeof(InOutBuffer));
 }
 
 AnimationIndex solve_motion_matching_cs(
@@ -168,7 +164,7 @@ AnimationIndex solve_motion_matching_cs(
   compute_shader.use();
   store_goal_feature(goal, mmsettings, uboBlock);
 
-  glm::uvec2 dispatch_size = {8, 1};
+  glm::uvec2 dispatch_size = {16, 1};
   
   uint invocations = dispatch_size.x * dispatch_size.y * group_size;
 
@@ -187,9 +183,7 @@ AnimationIndex solve_motion_matching_cs(
   
   ArgMin best = {INFINITY, curClip, curCadr, best_score};
   
-  uint idx = 0;
-  
-  
+  uint feature_idx = 0;
 
   for (uint nextClip = 0; nextClip < dataBase->clips.size(); nextClip++)
   {
@@ -197,22 +191,16 @@ AnimationIndex solve_motion_matching_cs(
 
     if (!has_goal_tags(goal.tags, clip.tags))
     { 
-      idx += clip.duration;
+      feature_idx += clip.duration;
       continue;
     }
     for (uint nextCadr = 0, n = clip.duration; nextCadr < n; nextCadr++)
     {
-      MatchingScores score = get_score(clip.features[nextCadr], goal.feature, mmsettings);
-      
-      float matching = score.full_score;
-      ArgMin cur = {matching, nextClip, nextCadr, score};
-      best = mm_min2(best, cur);
-      if (idx % 100 == 0)
-          debug_log("%f %f", scores[idx].full_score, score.full_score);
-      idx++;
+      mm_shader_min(best, scores[feature_idx], nextClip, nextCadr);
+      feature_idx++;
     }
   }
-
+  debug_log("shader");
   /*
   // parallel reduction for finding the minimum value in an array of positive floats
   uint arr_size = 256;
