@@ -20,11 +20,14 @@ struct FeatureCell
   vec4 nodesVelocity[(uint)AnimationFeaturesNode::Count];
   vec4 points[(uint)AnimationTrajectory::PathLength];
   vec4 pointsVelocity[(uint)AnimationTrajectory::PathLength];
-  float angularVelocity[(uint)AnimationTrajectory::PathLength];
-  float goalPathMatchingWeight;
-  uint64_t tag;
-  uint padding[2];
+  vec4 angularVelocity;
+  vec4 weights;
 };
+/*
+float goalPathMatchingWeight;
+  float realism;
+  uint padding[2];
+*/
 
 struct InOutBuffer
 {
@@ -32,14 +35,14 @@ struct InOutBuffer
   vec4 nodesVelocity[(uint)AnimationFeaturesNode::Count];
   vec4 points[(uint)AnimationTrajectory::PathLength];
   vec4 pointsVelocity[(uint)AnimationTrajectory::PathLength];
-  float angularVelocity[(uint)AnimationTrajectory::PathLength];
+  vec4 angularVelocity;
+  // padding[1];
+};
   /*
   uint64_t tag;
   float pose, goal_tag, goal_path, trajectory_v, trajectory_w;
   float full_score;
   */
-};
-
 struct ShaderMatchingScores
 {
   float pose, goal_tag, goal_path, trajectory_v, trajectory_w;
@@ -49,8 +52,8 @@ struct ShaderMatchingScores
 
 void store_database(AnimationDataBasePtr dataBase, const MotionMatchingSettings &mmsettings, uint feature_ssbo, int &size)
 {
-  float poseWeight = mmsettings.realism * mmsettings.poseMatchingWeight;
-  float velocityWeight = mmsettings.realism * mmsettings.velocityMatchingWeight;
+  float poseWeight = mmsettings.poseMatchingWeight;
+  float velocityWeight = mmsettings.velocityMatchingWeight;
   std::vector<FeatureCell> featureData;
   uint featuresCounter = 0;
   size = 0;
@@ -76,8 +79,8 @@ void store_database(AnimationDataBasePtr dataBase, const MotionMatchingSettings 
         nextFeatureCell.pointsVelocity[point] = vec4(frame.trajectory.trajectory[point].velocity * mmsettings.goalVelocityWeight, 0);
         nextFeatureCell.angularVelocity[point] = frame.trajectory.trajectory[point].angularVelocity * mmsettings.goalAngularVelocityWeight;
       }
-      nextFeatureCell.goalPathMatchingWeight = mmsettings.goalPathMatchingWeight;
-      nextFeatureCell.tag = clip.tags.tags;
+      nextFeatureCell.weights[0] = mmsettings.goalPathMatchingWeight;
+      nextFeatureCell.weights[1] = mmsettings.realism;
       featureData.push_back(nextFeatureCell);
       size++;
     }
@@ -87,8 +90,8 @@ void store_database(AnimationDataBasePtr dataBase, const MotionMatchingSettings 
 
 void store_goal_feature(const AnimationGoal& goal, const MotionMatchingSettings &mmsettings, uint uboBlock)
 {
-  float poseWeight = mmsettings.realism * mmsettings.poseMatchingWeight;
-  float velocityWeight = mmsettings.realism * mmsettings.velocityMatchingWeight;
+  float poseWeight = mmsettings.poseMatchingWeight;
+  float velocityWeight = mmsettings.velocityMatchingWeight;
   InOutBuffer goal_feature;
   for (uint node = 0; node < (uint)AnimationFeaturesNode::Count; node++)
   {
@@ -103,6 +106,7 @@ void store_goal_feature(const AnimationGoal& goal, const MotionMatchingSettings 
     goal_feature.points[point] = vec4(goal.feature.trajectory.trajectory[point].point, 0);
     goal_feature.pointsVelocity[point] = vec4(goal.feature.trajectory.trajectory[point].velocity * mmsettings.goalVelocityWeight, 0);
     goal_feature.angularVelocity[point] = goal.feature.trajectory.trajectory[point].angularVelocity * mmsettings.goalAngularVelocityWeight;
+    debug_log("%f", goal_feature.angularVelocity[point]);
   }
   /*
   goal_feature.tag = goal.tags.tags;
@@ -115,10 +119,10 @@ void store_goal_feature(const AnimationGoal& goal, const MotionMatchingSettings 
   */
   glBindBuffer(GL_UNIFORM_BUFFER, uboBlock);
   glBindBufferBase(GL_UNIFORM_BUFFER, 2, uboBlock);
-  glBufferData(GL_UNIFORM_BUFFER, 224, &goal_feature, GL_STREAM_DRAW);
+  glBufferData(GL_UNIFORM_BUFFER, sizeof(InOutBuffer), &goal_feature, GL_STREAM_DRAW);
   glBindBuffer(GL_UNIFORM_BUFFER, 0);
  
-  //debug_log("%f", goal_feature.angularVelocity[0]);
+  //debug_log("%d", sizeof(InOutBuffer));
 }
 
 AnimationIndex solve_motion_matching_cs(
@@ -204,7 +208,7 @@ AnimationIndex solve_motion_matching_cs(
       ArgMin cur = {matching, nextClip, nextCadr, score};
       best = mm_min2(best, cur);
       if (idx % 100 == 0)
-          debug_log("%f %f", scores[idx].goal_path, score.goal_path);
+          debug_log("%f %f", scores[idx].full_score, score.full_score);
       idx++;
     }
   }

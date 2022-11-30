@@ -16,10 +16,11 @@ struct FeatureCell
   vec4 nodesVelocity[nodesCount];
   vec4 points[pathLength];
   vec4 pointsVelocity[pathLength];
-  float angularVelocity[pathLength];
-  float goalPathMatchingWeight;
-  Tag tag;
-  uint padding[2];
+  vec4 angularVelocity;
+  vec4 weights;
+  //float goalPathMatchingWeight;
+  //float realism;
+  //uint padding[3];
 };
 
 struct InOutBuffer
@@ -28,13 +29,14 @@ struct InOutBuffer
   vec4 nodesVelocity[nodesCount];
   vec4 points[pathLength];
   vec4 pointsVelocity[pathLength];
-  float angularVelocity[pathLength];
-  /*
+  vec4 angularVelocity;
+  //uint padding[1];
+}; 
+ /*
   Tag tag;
   float pose, goal_tag, goal_path, trajectory_v, trajectory_w;
   float full_score;
   */
-};
 
 struct BufferMatchingScores
 {
@@ -116,7 +118,7 @@ float trajectory_w_norma(in FeatureCell feature, in InOutBuffer goal)
 {
   float path_norma = 0.f;
   for (uint i = 0; i < pathLength; i++)
-    path_norma += length(goal.angularVelocity[i] - feature.angularVelocity[i]);
+    path_norma += abs(goal.angularVelocity[i] - feature.angularVelocity[i]);
   return path_norma;
 }
 
@@ -124,10 +126,10 @@ BufferMatchingScores get_score(in FeatureCell feature, in InOutBuffer goal)
 {
   BufferMatchingScores score;
   score.pose = pose_matching_norma(feature, goal);
-  score.goal_path = goal_path_norma(feature, goal) * feature.goalPathMatchingWeight;
+  score.goal_path = goal_path_norma(feature, goal) * feature.weights[0];
   score.trajectory_v = trajectory_v_norma(feature, goal);
   score.trajectory_w = trajectory_w_norma(feature, goal);
-  score.full_score = score.pose + score.goal_path + score.trajectory_v + score.trajectory_w;
+  score.full_score = score.pose * feature.weights[1] + score.goal_path + score.trajectory_v + score.trajectory_w;
   return score;
 }
 
