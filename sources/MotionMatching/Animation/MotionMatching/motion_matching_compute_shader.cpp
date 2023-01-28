@@ -42,20 +42,16 @@ struct ShaderArgMin
   ShaderMatchingScores score;
 };
 
-void mm_shader_min(ArgMin &a, const ShaderMatchingScores &b, uint clip, uint frame)
+int mm_shader_min(ArgMin &a, const ShaderMatchingScores &b, uint &clip, uint &frame, uint &feature_idx)
 {
   if (b.full_score < a.value)
   {
     a.value = b.full_score;
     a.clip = clip;
     a.frame = frame;
-    a.score.full_score = b.full_score;
-    a.score.goal_path = b.goal_path;
-    a.score.pose = b.pose;
-    a.score.trajectory_v = b.trajectory_v;
-    a.score.trajectory_w = b.trajectory_w;
+    return feature_idx;
   }
-
+  return -1;
 }
 
 void store_database(AnimationDataBasePtr dataBase, const MotionMatchingSettings &mmsettings, uint feature_ssbo, int &size)
@@ -164,7 +160,7 @@ AnimationIndex solve_motion_matching_cs(
   compute_shader.use();
   store_goal_feature(goal, mmsettings, uboBlock);
 
-  glm::uvec2 dispatch_size = {16, 1};
+  glm::uvec2 dispatch_size = {4, 1};
   
   uint invocations = dispatch_size.x * dispatch_size.y * group_size;
 
@@ -176,14 +172,15 @@ AnimationIndex solve_motion_matching_cs(
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, result_ssbo);
   glBindBufferBase(GL_UNIFORM_BUFFER, 2, uboBlock);
 	compute_shader.dispatch(dispatch_size);
-  auto sync = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
-  glWaitSync(sync, 0, 1000000000);
+  //auto sync = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+  //glWaitSync(sync, 0, 1000000000);
 	compute_shader.wait();
-	retrieve_ssbo(result_ssbo, scores, dataSize * sizeof(ShaderMatchingScores), 1);
+	retrieve_ssbo(result_ssbo, scores, dataSize * sizeof(ShaderMatchingScores));
   
   ArgMin best = {INFINITY, curClip, curCadr, best_score};
   
   uint feature_idx = 0;
+  int best_idx = -1;
 
   for (uint nextClip = 0; nextClip < dataBase->clips.size(); nextClip++)
   {
@@ -196,11 +193,19 @@ AnimationIndex solve_motion_matching_cs(
     }
     for (uint nextCadr = 0, n = clip.duration; nextCadr < n; nextCadr++)
     {
-      mm_shader_min(best, scores[feature_idx], nextClip, nextCadr);
+      best_idx = mm_shader_min(best, scores[feature_idx], nextClip, nextCadr, feature_idx);
       feature_idx++;
     }
   }
-  debug_log("shader");
+  if (best_idx >= 0)
+  {
+    best.score.full_score = scores[best_idx].full_score;
+    best.score.goal_path = scores[best_idx].goal_path;
+    best.score.pose = scores[best_idx].pose;
+    best.score.trajectory_v = scores[best_idx].trajectory_v;
+    best.score.trajectory_w = scores[best_idx].trajectory_w;
+  }
+  //debug_log("shader");
   /*
   // parallel reduction for finding the minimum value in an array of positive floats
   uint arr_size = 256;
