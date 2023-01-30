@@ -2,7 +2,7 @@
 
 #compute_shader
 
-#define INF 1e20
+#define INF 1e10
 #define GROUP_SIZE 256
 
 const uint nodesCount = 4;
@@ -72,6 +72,7 @@ layout (std140, binding = 2) uniform DataBlock
 uniform int data_size;
 uniform int iterations;
 
+/*
 struct MatchingScores
 {
   float pose, goal_tag, goal_path, trajectory_v, trajectory_w;
@@ -84,6 +85,7 @@ struct ArgMin
   uint clip, frame;
   MatchingScores score;
 };
+*/
 
 float pose_matching_norma(in FeatureCell feature, in GoalBuffer goal)
 {
@@ -170,6 +172,7 @@ void main()
   }
   if (gl_LocalInvocationID.x == 0)
     results[gl_WorkGroupID.x] = min_scores[0];
+  //results[gl_WorkGroupID.x].full_score = goal_data.angularVelocity.x;
   memoryBarrierShared();
   barrier();
 }
