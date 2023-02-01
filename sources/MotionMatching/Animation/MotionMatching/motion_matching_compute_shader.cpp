@@ -1,6 +1,7 @@
 #include "motion_matching.h"
 #include "../settings.h"
 #include <render/shader/shader.h>
+#include <profiler/profiler.h>
 
 struct ArgMin
 {
@@ -16,16 +17,21 @@ struct FeatureCell
   vec4 points[(uint)AnimationTrajectory::PathLength];
   vec4 pointsVelocity[(uint)AnimationTrajectory::PathLength];
   vec4 angularVelocity;
-  vec4 weights;
+  float goalPathMatchingWeight;
+  float realism;
+  Tag tags;
 };
 
-struct InOutBuffer
+struct GoalFeatureCell
 {
   vec4 nodes[(uint)AnimationFeaturesNode::Count];
   vec4 nodesVelocity[(uint)AnimationFeaturesNode::Count];
   vec4 points[(uint)AnimationTrajectory::PathLength];
   vec4 pointsVelocity[(uint)AnimationTrajectory::PathLength];
   vec4 angularVelocity;
+  Tag tags;
+  uint padding1;
+  uint padding2;
 };
 
 struct ShaderMatchingScores
@@ -85,8 +91,9 @@ void store_database(AnimationDataBasePtr dataBase, const MotionMatchingSettings 
         nextFeatureCell.pointsVelocity[point] = vec4(frame.trajectory.trajectory[point].velocity * mmsettings.goalVelocityWeight, 0);
         nextFeatureCell.angularVelocity[point] = frame.trajectory.trajectory[point].angularVelocity * mmsettings.goalAngularVelocityWeight;
       }
-      nextFeatureCell.weights[0] = mmsettings.goalPathMatchingWeight;
-      nextFeatureCell.weights[1] = mmsettings.realism;
+      nextFeatureCell.goalPathMatchingWeight = mmsettings.goalPathMatchingWeight;
+      nextFeatureCell.realism = mmsettings.realism;
+      nextFeatureCell.tags = clip.tags.tags;
       featureData.push_back(nextFeatureCell);
       size++;
     }
@@ -98,7 +105,7 @@ void store_goal_feature(const AnimationGoal& goal, const MotionMatchingSettings 
 {
   float poseWeight = mmsettings.poseMatchingWeight;
   float velocityWeight = mmsettings.velocityMatchingWeight;
-  InOutBuffer goal_feature;
+  GoalFeatureCell goal_feature;
   for (uint node = 0; node < (uint)AnimationFeaturesNode::Count; node++)
   {
     goal_feature.nodes[node] = vec4(goal.feature.features.nodes[node] * float(mmsettings.nodeWeights[node]) * poseWeight, 0);
@@ -113,9 +120,10 @@ void store_goal_feature(const AnimationGoal& goal, const MotionMatchingSettings 
     goal_feature.pointsVelocity[point] = vec4(goal.feature.trajectory.trajectory[point].velocity * mmsettings.goalVelocityWeight, 0);
     goal_feature.angularVelocity[point] = goal.feature.trajectory.trajectory[point].angularVelocity * mmsettings.goalAngularVelocityWeight;
   }
+  goal_feature.tags = goal.tags.tags;
   glBindBuffer(GL_UNIFORM_BUFFER, uboBlock);
   glBindBufferBase(GL_UNIFORM_BUFFER, 2, uboBlock);
-  glBufferData(GL_UNIFORM_BUFFER, sizeof(InOutBuffer), &goal_feature, GL_STREAM_DRAW);
+  glBufferData(GL_UNIFORM_BUFFER, sizeof(GoalFeatureCell), &goal_feature, GL_STREAM_DRAW);
   glBindBuffer(GL_UNIFORM_BUFFER, 0);
 }
 
@@ -175,11 +183,13 @@ AnimationIndex solve_motion_matching_cs(
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, feature_ssbo);
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, result_ssbo);
   glBindBufferBase(GL_UNIFORM_BUFFER, 2, uboBlock);
-	compute_shader.dispatch(dispatch_size);
-  //auto sync = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
-  //glWaitSync(sync, 0, 1000000000);
-	compute_shader.wait();
-	retrieve_ssbo(result_ssbo, scores, resSize * sizeof(ShaderMatchingScores));
+  
+  {
+    ProfilerLabelGPU label("dispatch cs");
+	  compute_shader.dispatch(dispatch_size);
+	  compute_shader.wait();
+	  retrieve_ssbo(result_ssbo, scores, resSize * sizeof(ShaderMatchingScores));
+  }
   ArgMin best = {INFINITY, curClip, curCadr, best_score};
 
   ShaderMatchingScores best_matching;
@@ -190,7 +200,7 @@ AnimationIndex solve_motion_matching_cs(
       best_matching = scores[i];
     }
   }
-  //debug_log("%d", best_matching.idx);
+  
   uint l_border = 0, r_border = clip_labels.size() - 1;
   uint clip_idx = r_border / 2;
   while (l_border != r_border)

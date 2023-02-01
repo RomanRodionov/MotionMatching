@@ -10,7 +10,8 @@ const uint pathLength = 3;
 
 struct Tag
 {
-    uint tags[2];
+    uint tag1;
+    uint tag2;
 };
 
 struct FeatureCell
@@ -20,9 +21,11 @@ struct FeatureCell
   vec4 points[pathLength];
   vec4 pointsVelocity[pathLength];
   vec4 angularVelocity;
-  vec4 weights;
-  //float goalPathMatchingWeight;
-  //float realism;
+  float goalPathMatchingWeight;
+  float realism;
+  Tag tags;
+  //float feature.goalPathMatchingWeight;
+  //float feature.realism;
   //uint padding[3];
 };
 
@@ -33,7 +36,9 @@ struct GoalBuffer
   vec4 points[pathLength];
   vec4 pointsVelocity[pathLength];
   vec4 angularVelocity;
-  //uint padding[1];
+  Tag tags;
+  uint padding1;
+  uint padding2;
 }; 
  /*
   Tag tag;
@@ -100,7 +105,7 @@ float pose_matching_norma(in FeatureCell feature, in GoalBuffer goal)
 
 bool has_goal_tags(in Tag tag1, in Tag tag2)
 {
-  return tag1.tags[0] == tag2.tags[0] && tag1.tags[1] == tag2.tags[1];
+  return tag1.tag1 == tag2.tag1 && tag1.tag2 == tag2.tag2;
 }
 
 float goal_path_norma(in FeatureCell feature, in GoalBuffer goal)
@@ -132,10 +137,10 @@ MatchingScores get_score(in FeatureCell feature, in GoalBuffer goal)
 {
   MatchingScores score;
   score.pose = pose_matching_norma(feature, goal);
-  score.goal_path = goal_path_norma(feature, goal) * feature.weights[0];
+  score.goal_path = goal_path_norma(feature, goal) * feature.goalPathMatchingWeight;
   score.trajectory_v = trajectory_v_norma(feature, goal);
   score.trajectory_w = trajectory_w_norma(feature, goal);
-  score.full_score = score.pose * feature.weights[1] + score.goal_path + score.trajectory_v + score.trajectory_w;
+  score.full_score = score.pose * feature.realism + score.goal_path + score.trajectory_v + score.trajectory_w;
   return score;
 }
 
@@ -148,7 +153,8 @@ void main()
   for (uint i = 0; (i < iterations) && (gl_GlobalInvocationID.x * iterations + i < data_size); i++)
   {
     score = get_score(feature[gl_GlobalInvocationID.x * iterations + i], goal_data);
-    if (i == 0 || min_scores[gl_LocalInvocationID.x].full_score > score.full_score)
+    if (has_goal_tags(goal_data.tags, feature[gl_GlobalInvocationID.x * iterations + i].tags) && 
+            min_scores[gl_LocalInvocationID.x].full_score > score.full_score)
     {
       score.idx = gl_GlobalInvocationID.x * iterations + i;
       min_scores[gl_LocalInvocationID.x] = score;
@@ -172,7 +178,7 @@ void main()
   }
   if (gl_LocalInvocationID.x == 0)
     results[gl_WorkGroupID.x] = min_scores[0];
-  //results[gl_WorkGroupID.x].full_score = goal_data.angularVelocity.x;
+    
   memoryBarrierShared();
   barrier();
 }

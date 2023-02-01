@@ -114,6 +114,9 @@ void Application::main_loop()
       PROFILER(ecs_events);
       scene->process_events();
       ecs_events.stop();
+      extern void process_gpu_time_queries();
+      process_gpu_time_queries();
+      get_gpu_profiler().start_frame();
       PROFILER(ecs_act);
       scene->update_act();
       ecs_act.stop();
@@ -121,9 +124,6 @@ void Application::main_loop()
       PROFILER(swapchain);
       context.swap_buffer();
       swapchain.stop();
-      extern void process_gpu_time_queries();
-      process_gpu_time_queries();
-      get_gpu_profiler().start_frame();
       ProfilerLabelGPU frame_label("frame");
       PROFILER(ecs_render);
       scene->update_render();
