@@ -2,7 +2,7 @@
 
 #compute_shader
 
-#define INF 1e10
+#define INF 1e16
 #define GROUP_SIZE 256
 
 const uint nodesCount = 4;
@@ -24,9 +24,6 @@ struct FeatureCell
   float goalPathMatchingWeight;
   float realism;
   Tag tags;
-  //float feature.goalPathMatchingWeight;
-  //float feature.realism;
-  //uint padding[3];
 };
 
 struct GoalBuffer
@@ -40,11 +37,6 @@ struct GoalBuffer
   uint padding1;
   uint padding2;
 }; 
- /*
-  Tag tag;
-  float pose, goal_tag, goal_path, trajectory_v, trajectory_w;
-  float full_score;
-  */
 
 struct MatchingScores
 {
@@ -55,12 +47,7 @@ struct MatchingScores
 };
 
 layout(local_size_x = GROUP_SIZE, local_size_y = 1, local_size_z = 1) in;
-/*
-layout(std430, binding = 0) buffer inout_values
-{
-    float data_SSBO[];
-};
-*/
+
 layout(std430, binding = 0) buffer mm_data
 {
     FeatureCell feature[];
@@ -77,20 +64,6 @@ layout (std140, binding = 2) uniform DataBlock
 uniform int data_size;
 uniform int iterations;
 
-/*
-struct MatchingScores
-{
-  float pose, goal_tag, goal_path, trajectory_v, trajectory_w;
-  float full_score;
-};
-
-struct ArgMin
-{
-  float value;
-  uint clip, frame;
-  MatchingScores score;
-};
-*/
 
 float pose_matching_norma(in FeatureCell feature, in GoalBuffer goal)
 {
@@ -166,12 +139,11 @@ void main()
     arr_size++;
   memoryBarrierShared();
   barrier();
+
   while (step > 0) {
     if ((gl_LocalInvocationID.x < step) && (gl_GlobalInvocationID.x + step < arr_size)) 
-    {
       if (min_scores[gl_LocalInvocationID.x + step].full_score < min_scores[gl_LocalInvocationID.x].full_score) 
         min_scores[gl_LocalInvocationID.x] = min_scores[gl_LocalInvocationID.x + step];
-    }
     step /= 2;
     memoryBarrierShared();
     barrier();

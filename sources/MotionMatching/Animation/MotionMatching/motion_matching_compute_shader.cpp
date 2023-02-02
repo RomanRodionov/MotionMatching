@@ -225,14 +225,16 @@ AnimationIndex solve_motion_matching_cs(
     }
   }
 
-  best.score.full_score = best_matching.full_score;
-  best.score.goal_path = best_matching.goal_path;
-  best.score.pose = best_matching.pose;
-  best.score.trajectory_v = best_matching.trajectory_v;
-  best.score.trajectory_w = best_matching.trajectory_w;
-  best.clip = clip_idx;
-  best.frame = best_matching.idx - clip_labels[clip_idx];
-
-  best_score = best.score;
+  if ((best_matching.idx < clip_labels[clip_idx] + dataBase->clips[clip_idx].duration) &&
+      (has_goal_tags(goal.tags, dataBase->clips[clip_idx].tags))){
+    best.score.full_score = best_matching.full_score;
+    best.score.goal_path = best_matching.goal_path;
+    best.score.pose = best_matching.pose;
+    best.score.trajectory_v = best_matching.trajectory_v;
+    best.score.trajectory_w = best_matching.trajectory_w;
+    best.clip = clip_idx;
+    best.frame = best_matching.idx - clip_labels[clip_idx];
+    best_score = best.score;
+  }
   return AnimationIndex(dataBase, best.clip, best.frame);
 }
