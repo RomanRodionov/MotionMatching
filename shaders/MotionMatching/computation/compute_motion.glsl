@@ -21,22 +21,10 @@ struct FeatureCell
   vec4 points[pathLength];
   vec4 pointsVelocity[pathLength];
   vec4 angularVelocity;
-  float goalPathMatchingWeight;
-  float realism;
-  Tag tags;
-};
-
-struct GoalBuffer
-{
-  vec4 nodes[nodesCount];
-  vec4 nodesVelocity[nodesCount];
-  vec4 points[pathLength];
-  vec4 pointsVelocity[pathLength];
-  vec4 angularVelocity;
   Tag tags;
   uint padding1;
   uint padding2;
-}; 
+};
 
 struct MatchingScores
 {
@@ -58,14 +46,17 @@ layout(std430, binding = 1) buffer result_data
 };
 layout (std140, binding = 2) uniform DataBlock
 {
-    GoalBuffer goal_data;
+    FeatureCell goal_data;
 };  
 
 uniform int data_size;
 uniform int iterations;
+uniform float goalPathMatchingWeight;
+uniform float realism;
 
 
-float pose_matching_norma(in FeatureCell feature, in GoalBuffer goal)
+
+float pose_matching_norma(in FeatureCell feature, in FeatureCell goal)
 {
   float pose_norma = 0.f, vel_norma = 0.f;
   for (int i = 0; i < nodesCount; i++)
@@ -81,7 +72,7 @@ bool has_goal_tags(in Tag tag1, in Tag tag2)
   return tag1.tag1 == tag2.tag1 && tag1.tag2 == tag2.tag2;
 }
 
-float goal_path_norma(in FeatureCell feature, in GoalBuffer goal)
+float goal_path_norma(in FeatureCell feature, in FeatureCell goal)
 {
   float path_norma = 0.f;
   float distScale = length(goal.points[pathLength - 1] + feature.points[pathLength - 1]) * 0.5f;
@@ -90,7 +81,7 @@ float goal_path_norma(in FeatureCell feature, in GoalBuffer goal)
   return path_norma / (0.1f + distScale);
 }
 
-float trajectory_v_norma(in FeatureCell feature, in GoalBuffer goal)
+float trajectory_v_norma(in FeatureCell feature, in FeatureCell goal)
 {
   float path_norma = 0.f;
   for (uint i = 0; i < pathLength; i++)
@@ -98,7 +89,7 @@ float trajectory_v_norma(in FeatureCell feature, in GoalBuffer goal)
   return path_norma;
 }
 
-float trajectory_w_norma(in FeatureCell feature, in GoalBuffer goal)
+float trajectory_w_norma(in FeatureCell feature, in FeatureCell goal)
 {
   float path_norma = 0.f;
   for (uint i = 0; i < pathLength; i++)
@@ -106,14 +97,14 @@ float trajectory_w_norma(in FeatureCell feature, in GoalBuffer goal)
   return path_norma;
 }
 
-MatchingScores get_score(in FeatureCell feature, in GoalBuffer goal)
+MatchingScores get_score(in FeatureCell feature, in FeatureCell goal)
 {
   MatchingScores score;
   score.pose = pose_matching_norma(feature, goal);
-  score.goal_path = goal_path_norma(feature, goal) * feature.goalPathMatchingWeight;
+  score.goal_path = goal_path_norma(feature, goal) * goalPathMatchingWeight;
   score.trajectory_v = trajectory_v_norma(feature, goal);
   score.trajectory_w = trajectory_w_norma(feature, goal);
-  score.full_score = score.pose * feature.realism + score.goal_path + score.trajectory_v + score.trajectory_w;
+  score.full_score = score.pose * realism + score.goal_path + score.trajectory_v + score.trajectory_w;
   return score;
 }
 

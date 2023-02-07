@@ -137,6 +137,9 @@ void store_ssbo(uint ssbo, void *data, uint size);
 void update_ssbo(uint ssbo, void *data, uint size, uint offset=0);
 void retrieve_ssbo(uint ssbo, void *data, uint size);
 
+uint create_ubo(uint binding = 0);
+void store_ubo(uint ubo, void *data, uint size);
+
 class ComputeShader: public Shader
 {
 public:

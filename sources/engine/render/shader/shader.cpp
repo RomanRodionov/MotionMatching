@@ -239,23 +239,40 @@ uint create_ssbo(uint binding)
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, binding, ssbo);
 	return ssbo;
 }
+
 void store_ssbo(uint ssbo, void *data, uint size)
 {
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo);
 	glBufferData(GL_SHADER_STORAGE_BUFFER, size, data, GL_DYNAMIC_READ);
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0); // unbind
 }
+
 void update_ssbo(uint ssbo, void *data, uint size, uint offset)
 {
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo);
 	glBufferSubData(GL_SHADER_STORAGE_BUFFER, offset, size, data);
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0); // unbind
 }
+
 void retrieve_ssbo(uint ssbo, void *data, uint size)
 {
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo);
 	glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, size, data);
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0); // unbind
+}
+
+uint create_ubo(uint binding)
+{
+	uint ubo = 0;
+	glGenBuffers(1, &ubo);
+	return ubo;
+}
+
+void store_ubo(uint ubo, void *data, uint size)
+{
+	glBindBuffer(GL_UNIFORM_BUFFER, ubo);
+  glBufferData(GL_UNIFORM_BUFFER, size, data, GL_DYNAMIC_DRAW);
+  glBindBuffer(GL_UNIFORM_BUFFER, 0);
 }
 
 static ComputeShader badComputeShader(-1);

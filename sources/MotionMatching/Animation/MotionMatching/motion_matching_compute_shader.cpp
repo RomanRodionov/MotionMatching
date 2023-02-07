@@ -3,26 +3,7 @@
 #include <render/shader/shader.h>
 #include <profiler/profiler.h>
 
-struct ArgMin
-{
-  float value;
-  uint clip, frame;
-  MatchingScores score;
-};
-
 struct FeatureCell
-{
-  vec4 nodes[(uint)AnimationFeaturesNode::Count];
-  vec4 nodesVelocity[(uint)AnimationFeaturesNode::Count];
-  vec4 points[(uint)AnimationTrajectory::PathLength];
-  vec4 pointsVelocity[(uint)AnimationTrajectory::PathLength];
-  vec4 angularVelocity;
-  float goalPathMatchingWeight;
-  float realism;
-  Tag tags;
-};
-
-struct GoalFeatureCell
 {
   vec4 nodes[(uint)AnimationFeaturesNode::Count];
   vec4 nodesVelocity[(uint)AnimationFeaturesNode::Count];
@@ -41,25 +22,6 @@ struct ShaderMatchingScores
   uint idx;
   uint padding;
 };
-
-struct ShaderArgMin
-{
-  float value;
-  uint clip, frame;
-  ShaderMatchingScores score;
-};
-
-int mm_shader_min(ArgMin &a, const ShaderMatchingScores &b, uint &clip, uint &frame, uint &feature_idx)
-{
-  if (b.full_score < a.value)
-  {
-    a.value = b.full_score;
-    a.clip = clip;
-    a.frame = frame;
-    return feature_idx;
-  }
-  return -1;
-}
 
 void store_database(AnimationDataBasePtr dataBase, const MotionMatchingSettings &mmsettings, vector<uint> &labels, uint feature_ssbo, int &size)
 {
@@ -91,8 +53,6 @@ void store_database(AnimationDataBasePtr dataBase, const MotionMatchingSettings 
         nextFeatureCell.pointsVelocity[point] = vec4(frame.trajectory.trajectory[point].velocity * mmsettings.goalVelocityWeight, 0);
         nextFeatureCell.angularVelocity[point] = frame.trajectory.trajectory[point].angularVelocity * mmsettings.goalAngularVelocityWeight;
       }
-      nextFeatureCell.goalPathMatchingWeight = mmsettings.goalPathMatchingWeight;
-      nextFeatureCell.realism = mmsettings.realism;
       nextFeatureCell.tags = clip.tags.tags;
       featureData.push_back(nextFeatureCell);
       size++;
@@ -105,7 +65,7 @@ void store_goal_feature(const AnimationGoal& goal, const MotionMatchingSettings 
 {
   float poseWeight = mmsettings.poseMatchingWeight;
   float velocityWeight = mmsettings.velocityMatchingWeight;
-  GoalFeatureCell goal_feature;
+  FeatureCell goal_feature;
   for (uint node = 0; node < (uint)AnimationFeaturesNode::Count; node++)
   {
     goal_feature.nodes[node] = vec4(goal.feature.features.nodes[node] * float(mmsettings.nodeWeights[node]) * poseWeight, 0);
@@ -121,10 +81,7 @@ void store_goal_feature(const AnimationGoal& goal, const MotionMatchingSettings 
     goal_feature.angularVelocity[point] = goal.feature.trajectory.trajectory[point].angularVelocity * mmsettings.goalAngularVelocityWeight;
   }
   goal_feature.tags = goal.tags.tags;
-  glBindBuffer(GL_UNIFORM_BUFFER, uboBlock);
-  glBindBufferBase(GL_UNIFORM_BUFFER, 2, uboBlock);
-  glBufferData(GL_UNIFORM_BUFFER, sizeof(GoalFeatureCell), &goal_feature, GL_STREAM_DRAW);
-  glBindBuffer(GL_UNIFORM_BUFFER, 0);
+  store_ubo(uboBlock, &goal_feature, sizeof(FeatureCell));
 }
 
 AnimationIndex solve_motion_matching_cs(
@@ -140,13 +97,12 @@ AnimationIndex solve_motion_matching_cs(
   uint curCadr = index.get_cadr_index();
 
   // temporarily here, then I will take it somewhere \/
-  static uint feature_ssbo = 0;
-  static uint result_ssbo = 0;
+  static uint feature_ssbo = create_ssbo(0);
+  static uint result_ssbo = create_ssbo(1);
   static int dataSize, resSize;
   static bool database_stored = false;
   static ShaderMatchingScores *scores;
-  static uint uboBlock;
-  
+  static uint uboBlock = create_ubo(2);
   static uint group_size = 256;
   static glm::uvec2 dispatch_size = {4, 1};
   static uint invocations = dispatch_size.x * dispatch_size.y * group_size;
@@ -155,21 +111,13 @@ AnimationIndex solve_motion_matching_cs(
 
   if (!database_stored) 
   {
-    feature_ssbo = create_ssbo(0);
-    result_ssbo = create_ssbo(1);
     store_database(dataBase, mmsettings, clip_labels, feature_ssbo, dataSize);
-    
-    glGenBuffers(1, &uboBlock);
-    glBindBufferBase(GL_UNIFORM_BUFFER, 2, uboBlock); 
-
     iterations = dataSize / invocations;
     if (dataSize % invocations > 0) iterations++;
     resSize = dataSize / (iterations * group_size);
     if (dataSize % (iterations * group_size) > 0) resSize++;
-
     scores = new ShaderMatchingScores[resSize];
     store_ssbo(result_ssbo, NULL, resSize * sizeof(ShaderMatchingScores));
-
     database_stored = true;
   }
   //-------------------------------------------------/
@@ -180,6 +128,9 @@ AnimationIndex solve_motion_matching_cs(
 
   compute_shader.set_int("data_size", dataSize);
   compute_shader.set_int("iterations", iterations);
+  compute_shader.set_float("goalPathMatchingWeight", mmsettings.goalPathMatchingWeight);
+  compute_shader.set_float("realism", mmsettings.realism);
+
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, feature_ssbo);
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, result_ssbo);
   glBindBufferBase(GL_UNIFORM_BUFFER, 2, uboBlock);
@@ -190,7 +141,6 @@ AnimationIndex solve_motion_matching_cs(
 	  compute_shader.wait();
 	  retrieve_ssbo(result_ssbo, scores, resSize * sizeof(ShaderMatchingScores));
   }
-  ArgMin best = {INFINITY, curClip, curCadr, best_score};
 
   ShaderMatchingScores best_matching;
   for (int i = 0; i < resSize; ++i)
@@ -227,14 +177,12 @@ AnimationIndex solve_motion_matching_cs(
 
   if ((best_matching.idx < clip_labels[clip_idx] + dataBase->clips[clip_idx].duration) &&
       (has_goal_tags(goal.tags, dataBase->clips[clip_idx].tags))){
-    best.score.full_score = best_matching.full_score;
-    best.score.goal_path = best_matching.goal_path;
-    best.score.pose = best_matching.pose;
-    best.score.trajectory_v = best_matching.trajectory_v;
-    best.score.trajectory_w = best_matching.trajectory_w;
-    best.clip = clip_idx;
-    best.frame = best_matching.idx - clip_labels[clip_idx];
-    best_score = best.score;
+    best_score.full_score = best_matching.full_score;
+    best_score.goal_path = best_matching.goal_path;
+    best_score.pose = best_matching.pose;
+    best_score.trajectory_v = best_matching.trajectory_v;
+    best_score.trajectory_w = best_matching.trajectory_w;
+    return AnimationIndex(dataBase, clip_idx, best_matching.idx - clip_labels[clip_idx]);
   }
-  return AnimationIndex(dataBase, best.clip, best.frame);
+  return AnimationIndex(dataBase, curClip, curCadr);
 }
