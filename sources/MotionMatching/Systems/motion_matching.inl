@@ -93,6 +93,34 @@ struct MMProfiler : ecs::Singleton
   }
 };
 
+constexpr int MIN_QUEUE_SIZE = 10;
+constexpr float WAIT_LIMIT = 0.001f;
+struct GoalsBuffer : ecs::Singleton
+{
+  std::queue<AnimationGoal> goals = {};
+  float wait_time = 0;
+  uint get_size()
+  {
+    return goals.size();
+  }
+  bool ready()
+  {
+    return (goals.size() >= MIN_QUEUE_SIZE) || ((Time::time() - wait_time) > WAIT_LIMIT && goals.size() > 0);
+  }
+  void push(AnimationGoal goal)
+  {
+    if (goals.size() % MIN_QUEUE_SIZE == 0)
+      wait_time = Time::time();
+    goals.push(goal);
+  }
+  AnimationGoal get()
+  {
+    AnimationGoal front_element = goals.front();
+    goals.pop();
+    return front_element;
+  }
+};
+
 SYSTEM(stage=act;before=animation_player_update) motion_matching_update(
   Transform &transform,
   AnimationPlayer &animationPlayer,
@@ -103,7 +131,8 @@ SYSTEM(stage=act;before=animation_player_update) motion_matching_update(
   Settings &settings,
   SettingsContainer &settingsContainer,
   MMProfiler &profiler,
-  const MainCamera &mainCamera)
+  const MainCamera &mainCamera,
+  GoalsBuffer goal_buffer)
 {
   float dt = Time::delta_time();
   

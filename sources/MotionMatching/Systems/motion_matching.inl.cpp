@@ -14,7 +14,8 @@ ecs::SystemDescription motion_matching_update_descr("motion_matching_update", {
   {ecs::get_type_description<Settings>("settings"), false},
   {ecs::get_type_description<SettingsContainer>("settingsContainer"), false},
   {ecs::get_type_description<MMProfiler>("profiler"), false},
-  {ecs::get_type_description<MainCamera>("mainCamera"), false}
+  {ecs::get_type_description<MainCamera>("mainCamera"), false},
+  {ecs::get_type_description<GoalsBuffer>("goal_buffer"), false}
 }, {
 }, {},
 {"animation_player_update"},
