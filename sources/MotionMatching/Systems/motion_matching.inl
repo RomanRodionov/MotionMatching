@@ -65,6 +65,66 @@ static bool trajection_tolerance_test(AnimationIndex index, const AnimationGoal 
   return false;
 }
 
+struct IdentifiedGoal
+{
+  AnimationGoal goal;
+  ecs::EntityId eid;
+};
+
+constexpr int MIN_QUEUE_SIZE = 10;
+constexpr float WAIT_LIMIT = 0.001f;
+struct GoalsBuffer : ecs::Singleton
+{
+  std::queue<IdentifiedGoal> goals = {};
+  float wait_time = 0;
+  uint get_size()
+  {
+    return goals.size();
+  }
+  bool ready()
+  {
+    return (goals.size() >= MIN_QUEUE_SIZE) || ((Time::time() - wait_time) > WAIT_LIMIT && goals.size() > 0);
+  }
+  void push(AnimationGoal goal, ecs::EntityId eid)
+  {
+    if (goals.size() % MIN_QUEUE_SIZE == 0)
+      wait_time = Time::time();
+    goals.push({goal, eid});
+  }
+  IdentifiedGoal get()
+  {
+    IdentifiedGoal front_element = goals.front();
+    goals.pop();
+    return front_element;
+  }
+};
+
+struct ResultsBuffer : ecs::Singleton
+{
+  std::map<ecs::EntityId, std::queue<std::pair<uint, uint>>> results;
+  bool ready(ecs::EntityId eid)
+  {
+    return results[eid].size() > 0;
+  }
+  void push(std::pair<uint, uint> result, ecs::EntityId eid)
+  {
+    results[eid].push(result);
+  }
+  std::pair<uint, uint> get(ecs::EntityId eid)
+  {
+    std::pair<uint, uint> front_element = results[eid].front();
+    results[eid].pop();
+    return front_element;
+  }
+};
+
+SYSTEM(stage=act;before=animation_player_update;after=motion_matching_update) motion_matching_cs_update(
+  GoalsBuffer goal_buffer,
+  ResultsBuffer result_buffer)
+{
+  
+}
+
 constexpr int MAX_SAMPLES = 10000;
 struct MMProfiler : ecs::Singleton
 {
@@ -93,34 +153,6 @@ struct MMProfiler : ecs::Singleton
   }
 };
 
-constexpr int MIN_QUEUE_SIZE = 10;
-constexpr float WAIT_LIMIT = 0.001f;
-struct GoalsBuffer : ecs::Singleton
-{
-  std::queue<AnimationGoal> goals = {};
-  float wait_time = 0;
-  uint get_size()
-  {
-    return goals.size();
-  }
-  bool ready()
-  {
-    return (goals.size() >= MIN_QUEUE_SIZE) || ((Time::time() - wait_time) > WAIT_LIMIT && goals.size() > 0);
-  }
-  void push(AnimationGoal goal)
-  {
-    if (goals.size() % MIN_QUEUE_SIZE == 0)
-      wait_time = Time::time();
-    goals.push(goal);
-  }
-  AnimationGoal get()
-  {
-    AnimationGoal front_element = goals.front();
-    goals.pop();
-    return front_element;
-  }
-};
-
 SYSTEM(stage=act;before=animation_player_update) motion_matching_update(
   Transform &transform,
   AnimationPlayer &animationPlayer,
@@ -132,7 +164,9 @@ SYSTEM(stage=act;before=animation_player_update) motion_matching_update(
   SettingsContainer &settingsContainer,
   MMProfiler &profiler,
   const MainCamera &mainCamera,
-  GoalsBuffer goal_buffer)
+  GoalsBuffer goal_buffer,
+  ResultsBuffer result_buffer,
+  ecs::EntityId eid)
 {
   float dt = Time::delta_time();
   

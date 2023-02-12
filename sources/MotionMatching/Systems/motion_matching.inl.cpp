@@ -2,6 +2,22 @@
 #include <ecs_perform.h>
 //Code-generator production
 
+void motion_matching_cs_update_func();
+
+ecs::SystemDescription motion_matching_cs_update_descr("motion_matching_cs_update", {
+  {ecs::get_type_description<GoalsBuffer>("goal_buffer"), false},
+  {ecs::get_type_description<ResultsBuffer>("result_buffer"), false}
+}, {
+}, {},
+{"animation_player_update"},
+{"motion_matching_update"},
+motion_matching_cs_update_func, "act", {}, false);
+
+void motion_matching_cs_update_func()
+{
+  ecs::perform_system(motion_matching_cs_update_descr, motion_matching_cs_update);
+}
+
 void motion_matching_update_func();
 
 ecs::SystemDescription motion_matching_update_descr("motion_matching_update", {
@@ -15,7 +31,9 @@ ecs::SystemDescription motion_matching_update_descr("motion_matching_update", {
   {ecs::get_type_description<SettingsContainer>("settingsContainer"), false},
   {ecs::get_type_description<MMProfiler>("profiler"), false},
   {ecs::get_type_description<MainCamera>("mainCamera"), false},
-  {ecs::get_type_description<GoalsBuffer>("goal_buffer"), false}
+  {ecs::get_type_description<GoalsBuffer>("goal_buffer"), false},
+  {ecs::get_type_description<ResultsBuffer>("result_buffer"), false},
+  {ecs::get_type_description<ecs::EntityId>("eid"), false}
 }, {
 }, {},
 {"animation_player_update"},
