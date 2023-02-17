@@ -1,5 +1,6 @@
 #include "Animation/animation_player.h"
 #include "Animation/settings.h"
+#include "Animation/MotionMatching/motion_matching.h"
 #include <map>
 #include "application/profile_tracker.h"
 #include <ecs.h>
@@ -118,11 +119,54 @@ struct ResultsBuffer : ecs::Singleton
   }
 };
 
-SYSTEM(stage=act;before=animation_player_update;after=motion_matching_update) motion_matching_cs_update(
-  GoalsBuffer goal_buffer,
-  ResultsBuffer result_buffer)
+struct CSData : ecs::Singleton
 {
-  
+  uint feature_ssbo;
+  uint result_ssbo;
+  uint goal_ubo;
+  vector<uint> clip_labels;
+  int dataSize;
+};
+
+EVENT() init_cs_data(
+  const ecs::OnEntityCreated &,
+  Asset<AnimationDataBase> &dataBasePtr,
+  bool &mm_mngr,
+  CSData &cs_data,
+  SettingsContainer &settingsContainer,
+  int *mmIndex,
+  int &mmOptimisationIndex
+  )
+{
+  const MotionMatchingSettings &mmsettings = settingsContainer.motionMatchingSettings[mmIndex ? *mmIndex : 0].second;
+  const MotionMatchingOptimisationSettings &OptimisationSettings = 
+      settingsContainer.motionMatchingOptimisationSettings[mmOptimisationIndex].second;
+  if ((MotionMatchingSolverType)OptimisationSettings.solverType == MotionMatchingSolverType::CSBruteForce)
+  {
+    cs_data.feature_ssbo = create_ssbo(0);
+    cs_data.result_ssbo = create_ssbo(1);
+    cs_data.goal_ubo = create_ubo(2);
+    store_database(dataBasePtr, mmsettings, cs_data.clip_labels, cs_data.feature_ssbo, cs_data.dataSize);
+    debug_log("cs buffers are initialised");
+  }
+}
+
+SYSTEM(stage=act;before=animation_player_update;after=motion_matching_update) motion_matching_cs_update(
+  GoalsBuffer &goal_buffer,
+  ResultsBuffer &result_buffer)
+{
+  while(goal_buffer.ready())
+  {
+    uint queue_size = goal_buffer.get_size();
+    for (uint idx = 0; idx < MIN_QUEUE_SIZE && idx < queue_size; ++idx)
+    {
+      IdentifiedGoal goal = goal_buffer.get();
+
+
+      std::pair<uint, uint> result = {0, 0};
+      result_buffer.push(result, goal.eid);
+    }
+  }
 }
 
 constexpr int MAX_SAMPLES = 10000;
@@ -164,9 +208,9 @@ SYSTEM(stage=act;before=animation_player_update) motion_matching_update(
   SettingsContainer &settingsContainer,
   MMProfiler &profiler,
   const MainCamera &mainCamera,
-  GoalsBuffer goal_buffer,
-  ResultsBuffer result_buffer,
-  ecs::EntityId eid)
+  GoalsBuffer &goal_buffer,
+  ResultsBuffer &result_buffer,
+  ecs::EntityId &eid)
 {
   float dt = Time::delta_time();
   

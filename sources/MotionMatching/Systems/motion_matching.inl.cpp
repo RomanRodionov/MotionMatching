@@ -45,4 +45,30 @@ void motion_matching_update_func()
   ecs::perform_system(motion_matching_update_descr, motion_matching_update);
 }
 
+void init_cs_data_handler(const ecs::Event &event);
+void init_cs_data_singl_handler(const ecs::Event &event, ecs::EntityId eid);
+
+ecs::EventDescription init_cs_data_descr(
+  ecs::get_mutable_event_handlers<ecs::OnEntityCreated>(), "init_cs_data", {
+  {ecs::get_type_description<Asset<AnimationDataBase>>("dataBasePtr"), false},
+  {ecs::get_type_description<bool>("mm_mngr"), false},
+  {ecs::get_type_description<CSData>("cs_data"), false},
+  {ecs::get_type_description<SettingsContainer>("settingsContainer"), false},
+  {ecs::get_type_description<int>("mmIndex"), true},
+  {ecs::get_type_description<int>("mmOptimisationIndex"), false}
+}, {
+}, {},
+{},
+{},
+init_cs_data_handler, init_cs_data_singl_handler, {});
+
+void init_cs_data_handler(const ecs::Event &event)
+{
+  ecs::perform_event((const ecs::OnEntityCreated&)event, init_cs_data_descr, init_cs_data);
+}
+void init_cs_data_singl_handler(const ecs::Event &event, ecs::EntityId eid)
+{
+  ecs::perform_event((const ecs::OnEntityCreated&)event, init_cs_data_descr, eid, init_cs_data);
+}
+
 

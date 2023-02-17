@@ -31,3 +31,6 @@ public:
 
   AnimationDataBasePtr get_data_base() const;
 };
+
+void store_database(AnimationDataBasePtr dataBase, const MotionMatchingSettings &mmsettings, vector<uint> &labels, uint feature_ssbo, int &size);
+void store_goal_feature(const AnimationGoal& goal, const MotionMatchingSettings &mmsettings, uint uboBlock);
