@@ -69,10 +69,12 @@ static bool trajection_tolerance_test(AnimationIndex index, const AnimationGoal 
 struct IdentifiedGoal
 {
   AnimationGoal goal;
+  uint curClip, curCadr;
+  MatchingScores best_score;
   ecs::EntityId eid;
 };
 
-constexpr int MIN_QUEUE_SIZE = 10;
+constexpr int MIN_QUEUE_SIZE = 1;
 constexpr float WAIT_LIMIT = 0.001f;
 struct GoalsBuffer : ecs::Singleton
 {
@@ -86,11 +88,11 @@ struct GoalsBuffer : ecs::Singleton
   {
     return (goals.size() >= MIN_QUEUE_SIZE) || ((Time::time() - wait_time) > WAIT_LIMIT && goals.size() > 0);
   }
-  void push(AnimationGoal goal, ecs::EntityId eid)
+  void push(AnimationGoal goal, uint curClip, uint curCadr, MatchingScores best_score, ecs::EntityId eid)
   {
     if (goals.size() % MIN_QUEUE_SIZE == 0)
       wait_time = Time::time();
-    goals.push({goal, eid});
+    goals.push({goal, curClip, curCadr, best_score, eid});
   }
   IdentifiedGoal get()
   {
@@ -102,19 +104,23 @@ struct GoalsBuffer : ecs::Singleton
 
 struct ResultsBuffer : ecs::Singleton
 {
-  std::map<ecs::EntityId, std::queue<std::pair<uint, uint>>> results;
+  std::map<ecs::EntityId, std::queue<AnimationIndex>> results;
+  std::map<ecs::EntityId, std::queue<MatchingScores>> scores;
   bool ready(ecs::EntityId eid)
   {
     return results[eid].size() > 0;
   }
-  void push(std::pair<uint, uint> result, ecs::EntityId eid)
+  void push(AnimationIndex result, MatchingScores best_score, ecs::EntityId eid)
   {
     results[eid].push(result);
+    scores[eid].push(best_score);
   }
-  std::pair<uint, uint> get(ecs::EntityId eid)
+  AnimationIndex get(ecs::EntityId eid, MatchingScores &best_score)
   {
-    std::pair<uint, uint> front_element = results[eid].front();
+    AnimationIndex front_element = results[eid].front();
     results[eid].pop();
+    best_score = scores[eid].front();
+    scores[eid].pop();
     return front_element;
   }
 };
@@ -156,19 +162,94 @@ SYSTEM(stage=act;before=motion_matching_cs_update, motion_matching_update) init_
 }
 
 SYSTEM(stage=act;before=animation_player_update;after=motion_matching_update) motion_matching_cs_update(
+  Asset<AnimationDataBase> &dataBase,
+  bool &mm_mngr,
   GoalsBuffer &goal_buffer,
-  ResultsBuffer &result_buffer)
+  ResultsBuffer &result_buffer,
+  CSData &cs_data,
+  SettingsContainer &settingsContainer,
+  int *mmIndex)
 {
-  while(goal_buffer.ready())
+  if (goal_buffer.get_size() > 0)
   {
-    uint queue_size = goal_buffer.get_size();
-    for (uint idx = 0; idx < MIN_QUEUE_SIZE && idx < queue_size; ++idx)
+    const MotionMatchingSettings &mmsettings = settingsContainer.motionMatchingSettings[mmIndex ? *mmIndex : 0].second;
+    auto compute_shader = get_compute_shader("compute_motion");
+    compute_shader.use();
+    compute_shader.set_int("data_size", cs_data.dataSize);
+    compute_shader.set_int("iterations", cs_data.iterations);
+    compute_shader.set_float("goalPathMatchingWeight", mmsettings.goalPathMatchingWeight);
+    compute_shader.set_float("realism", mmsettings.realism);
+    vector<IdentifiedGoal> goals;
+    while(goal_buffer.ready())
     {
-      IdentifiedGoal goal = goal_buffer.get();
+      uint queue_size = goal_buffer.get_size();
+      for (uint idx = 0; idx < MIN_QUEUE_SIZE && idx < queue_size; ++idx)
+      {
+        IdentifiedGoal goal = goal_buffer.get();
+        goals.push_back(goal);
+        store_goal_feature(goal.goal, mmsettings, cs_data.goal_ubo);
 
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, cs_data.feature_ssbo);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, cs_data.result_ssbo);
+        glBindBufferBase(GL_UNIFORM_BUFFER, 2, cs_data.goal_ubo);
 
-      std::pair<uint, uint> result = {0, 0};
-      result_buffer.push(result, goal.eid);
+        compute_shader.dispatch(cs_data.dispatch_size);
+        compute_shader.wait();
+      }
+      retrieve_ssbo(cs_data.result_ssbo, cs_data.scores, cs_data.resSize * sizeof(ShaderMatchingScores));
+      ShaderMatchingScores best_matching;
+      for (uint idx = 0; idx < MIN_QUEUE_SIZE && idx < queue_size; ++idx)
+      {
+        best_matching = cs_data.scores[0];
+        for (int i = 1; i < cs_data.resSize; ++i)
+        {
+          if (cs_data.scores[i].full_score < best_matching.full_score)
+          {
+            best_matching = cs_data.scores[i];
+          }
+        }
+
+        uint l_border = 0, r_border = cs_data.clip_labels.size() - 1;
+        uint clip_idx = r_border / 2;
+        while (l_border != r_border)
+        {
+          if (best_matching.idx >= cs_data.clip_labels[r_border])
+          {
+            l_border = r_border;
+          }
+          else if (best_matching.idx < cs_data.clip_labels[clip_idx])
+          {
+            r_border = clip_idx;
+            clip_idx = (r_border + l_border) / 2;
+          }
+          else if (best_matching.idx < cs_data.clip_labels[clip_idx + 1])
+          {
+            l_border = r_border = clip_idx;
+          }
+          else
+          {
+            l_border = clip_idx;
+            clip_idx = (r_border + l_border + 1) / 2;
+          }
+        }
+
+        if ((best_matching.idx < cs_data.clip_labels[clip_idx] + dataBase->clips[clip_idx].duration) &&
+            (has_goal_tags(goals[idx].goal.tags, dataBase->clips[clip_idx].tags))){
+          goals[idx].best_score.full_score = best_matching.full_score;
+          goals[idx].best_score.goal_path = best_matching.goal_path;
+          goals[idx].best_score.pose = best_matching.pose;
+          goals[idx].best_score.trajectory_v = best_matching.trajectory_v;
+          goals[idx].best_score.trajectory_w = best_matching.trajectory_w;
+          result_buffer.push(AnimationIndex(dataBase, clip_idx, best_matching.idx - cs_data.clip_labels[clip_idx]), 
+              goals[idx].best_score, goals[idx].eid);
+        }
+        else
+        {
+          result_buffer.push(AnimationIndex(dataBase, goals[idx].curClip, goals[idx].curCadr), 
+              goals[idx].best_score, goals[idx].eid);
+        }
+      }
+      goals.clear();
     }
   }
 }

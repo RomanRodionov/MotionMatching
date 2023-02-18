@@ -24,8 +24,13 @@ void init_cs_data_func()
 void motion_matching_cs_update_func();
 
 ecs::SystemDescription motion_matching_cs_update_descr("motion_matching_cs_update", {
+  {ecs::get_type_description<Asset<AnimationDataBase>>("dataBase"), false},
+  {ecs::get_type_description<bool>("mm_mngr"), false},
   {ecs::get_type_description<GoalsBuffer>("goal_buffer"), false},
-  {ecs::get_type_description<ResultsBuffer>("result_buffer"), false}
+  {ecs::get_type_description<ResultsBuffer>("result_buffer"), false},
+  {ecs::get_type_description<CSData>("cs_data"), false},
+  {ecs::get_type_description<SettingsContainer>("settingsContainer"), false},
+  {ecs::get_type_description<int>("mmIndex"), true}
 }, {
 }, {},
 {"animation_player_update"},
