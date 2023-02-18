@@ -121,33 +121,37 @@ struct ResultsBuffer : ecs::Singleton
 
 struct CSData : ecs::Singleton
 {
-  uint feature_ssbo;
-  uint result_ssbo;
-  uint goal_ubo;
+  uint feature_ssbo, result_ssbo, goal_ubo, group_size = 256;
+  glm::uvec2 dispatch_size = {4, 1};
+  uint invocations = dispatch_size.x * dispatch_size.y * group_size;
   vector<uint> clip_labels;
-  int dataSize;
+  int dataSize, resSize, iterations;
+  ShaderMatchingScores *scores;
+  bool initialized = false;
 };
 
-EVENT() init_cs_data(
-  const ecs::OnEntityCreated &,
-  Asset<AnimationDataBase> &dataBasePtr,
+SYSTEM(stage=act;before=motion_matching_cs_update, motion_matching_update) init_cs_data(
+  Asset<AnimationDataBase> &dataBase,
   bool &mm_mngr,
   CSData &cs_data,
   SettingsContainer &settingsContainer,
-  int *mmIndex,
-  int &mmOptimisationIndex
-  )
+  int *mmIndex)
 {
-  const MotionMatchingSettings &mmsettings = settingsContainer.motionMatchingSettings[mmIndex ? *mmIndex : 0].second;
-  const MotionMatchingOptimisationSettings &OptimisationSettings = 
-      settingsContainer.motionMatchingOptimisationSettings[mmOptimisationIndex].second;
-  if ((MotionMatchingSolverType)OptimisationSettings.solverType == MotionMatchingSolverType::CSBruteForce)
+  if (!cs_data.initialized)
   {
+    const MotionMatchingSettings &mmsettings = settingsContainer.motionMatchingSettings[mmIndex ? *mmIndex : 0].second;
     cs_data.feature_ssbo = create_ssbo(0);
     cs_data.result_ssbo = create_ssbo(1);
     cs_data.goal_ubo = create_ubo(2);
-    store_database(dataBasePtr, mmsettings, cs_data.clip_labels, cs_data.feature_ssbo, cs_data.dataSize);
-    debug_log("cs buffers are initialised");
+    store_database(dataBase, mmsettings, cs_data.clip_labels, cs_data.feature_ssbo, cs_data.dataSize);
+    cs_data.iterations = cs_data.dataSize / cs_data.invocations;
+    if (cs_data.dataSize % cs_data.invocations > 0) cs_data.iterations++;
+    cs_data.resSize = cs_data.dataSize / (cs_data.iterations * cs_data.group_size);
+    if (cs_data.dataSize % (cs_data.iterations * cs_data.group_size) > 0) cs_data.resSize++;
+    cs_data.scores = new ShaderMatchingScores[cs_data.resSize];
+    store_ssbo(cs_data.result_ssbo, NULL, cs_data.resSize * sizeof(ShaderMatchingScores));
+    cs_data.initialized = true;
+    debug_log("cs data have been initialized");
   }
 }
 
