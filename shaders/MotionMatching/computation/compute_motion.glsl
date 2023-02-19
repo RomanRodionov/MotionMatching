@@ -53,8 +53,8 @@ uniform int data_size;
 uniform int iterations;
 uniform float goalPathMatchingWeight;
 uniform float realism;
-
-
+uniform int queue_shift;
+uniform int queue_index;
 
 float pose_matching_norma(in FeatureCell feature, in FeatureCell goal)
 {
@@ -140,7 +140,7 @@ void main()
     barrier();
   }
   if (gl_LocalInvocationID.x == 0)
-    results[gl_WorkGroupID.x] = min_scores[0];
+    results[queue_index * queue_shift + gl_WorkGroupID.x] = min_scores[0];
     
   memoryBarrierShared();
   barrier();

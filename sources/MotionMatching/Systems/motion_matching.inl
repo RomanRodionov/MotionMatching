@@ -74,8 +74,8 @@ struct IdentifiedGoal
   ecs::EntityId eid;
 };
 
-constexpr int MIN_QUEUE_SIZE = 1;
-constexpr float WAIT_LIMIT = 0.001f;
+constexpr int MIN_QUEUE_SIZE = 100;
+constexpr float WAIT_LIMIT = 0.1f;
 struct GoalsBuffer : ecs::Singleton
 {
   std::queue<IdentifiedGoal> goals = {};
@@ -104,23 +104,23 @@ struct GoalsBuffer : ecs::Singleton
 
 struct ResultsBuffer : ecs::Singleton
 {
-  std::map<ecs::EntityId, std::queue<AnimationIndex>> results;
-  std::map<ecs::EntityId, std::queue<MatchingScores>> scores;
+  std::map<ecs::EntityId, AnimationIndex> results;
+  std::map<ecs::EntityId, MatchingScores> scores;
   bool ready(ecs::EntityId eid)
   {
-    return results[eid].size() > 0;
+    return results.find(eid) != results.end();
   }
   void push(AnimationIndex result, MatchingScores best_score, ecs::EntityId eid)
   {
-    results[eid].push(result);
-    scores[eid].push(best_score);
+    results[eid] = result;
+    scores[eid] = best_score;
   }
   AnimationIndex get(ecs::EntityId eid, MatchingScores &best_score)
   {
-    AnimationIndex front_element = results[eid].front();
-    results[eid].pop();
-    best_score = scores[eid].front();
-    scores[eid].pop();
+    AnimationIndex front_element = results[eid];
+    results.erase(eid);
+    best_score = scores[eid];
+    scores.erase(eid);
     return front_element;
   }
 };
@@ -154,8 +154,8 @@ SYSTEM(stage=act;before=motion_matching_cs_update, motion_matching_update) init_
     if (cs_data.dataSize % cs_data.invocations > 0) cs_data.iterations++;
     cs_data.resSize = cs_data.dataSize / (cs_data.iterations * cs_data.group_size);
     if (cs_data.dataSize % (cs_data.iterations * cs_data.group_size) > 0) cs_data.resSize++;
-    cs_data.scores = new ShaderMatchingScores[cs_data.resSize];
-    store_ssbo(cs_data.result_ssbo, NULL, cs_data.resSize * sizeof(ShaderMatchingScores));
+    cs_data.scores = new ShaderMatchingScores[MIN_QUEUE_SIZE * cs_data.resSize];
+    store_ssbo(cs_data.result_ssbo, NULL, MIN_QUEUE_SIZE * cs_data.resSize * sizeof(ShaderMatchingScores));
     cs_data.initialized = true;
     debug_log("cs data have been initialized");
   }
@@ -179,12 +179,15 @@ SYSTEM(stage=act;before=animation_player_update;after=motion_matching_update) mo
     compute_shader.set_int("iterations", cs_data.iterations);
     compute_shader.set_float("goalPathMatchingWeight", mmsettings.goalPathMatchingWeight);
     compute_shader.set_float("realism", mmsettings.realism);
+    compute_shader.set_int("queue_shift", cs_data.resSize);
     vector<IdentifiedGoal> goals;
+    debug_log("%d\n", goal_buffer.get_size());
     while(goal_buffer.ready())
     {
       uint queue_size = goal_buffer.get_size();
       for (uint idx = 0; idx < MIN_QUEUE_SIZE && idx < queue_size; ++idx)
       {
+        compute_shader.set_int("queue_index", idx);
         IdentifiedGoal goal = goal_buffer.get();
         goals.push_back(goal);
         store_goal_feature(goal.goal, mmsettings, cs_data.goal_ubo);
@@ -196,16 +199,16 @@ SYSTEM(stage=act;before=animation_player_update;after=motion_matching_update) mo
         compute_shader.dispatch(cs_data.dispatch_size);
         compute_shader.wait();
       }
-      retrieve_ssbo(cs_data.result_ssbo, cs_data.scores, cs_data.resSize * sizeof(ShaderMatchingScores));
+      retrieve_ssbo(cs_data.result_ssbo, cs_data.scores, MIN_QUEUE_SIZE * cs_data.resSize * sizeof(ShaderMatchingScores));
       ShaderMatchingScores best_matching;
       for (uint idx = 0; idx < MIN_QUEUE_SIZE && idx < queue_size; ++idx)
       {
         best_matching = cs_data.scores[0];
         for (int i = 1; i < cs_data.resSize; ++i)
         {
-          if (cs_data.scores[i].full_score < best_matching.full_score)
+          if (cs_data.scores[cs_data.resSize * idx + i].full_score < best_matching.full_score)
           {
-            best_matching = cs_data.scores[i];
+            best_matching = cs_data.scores[cs_data.resSize * idx + i];
           }
         }
 
@@ -362,7 +365,16 @@ SYSTEM(stage=act;before=animation_player_update) motion_matching_update(
           best_index = solve_motion_matching(dataBase, currentIndex, goal, matching.bestScore, mmsettings);
           break;
         case MotionMatchingSolverType::CSBruteForce :
-          best_index = solve_motion_matching_cs(dataBase, currentIndex, goal, matching.bestScore, mmsettings);
+          goal_buffer.push(goal, currentIndex.get_clip_index(), currentIndex.get_cadr_index(), matching.bestScore, eid);
+          if (result_buffer.ready(eid))
+          {
+            best_index = result_buffer.get(eid, matching.bestScore);
+          }
+          else
+          {
+            best_index = AnimationIndex(dataBase, currentIndex.get_clip_index(), currentIndex.get_cadr_index());
+          }
+          //best_index = solve_motion_matching_cs(dataBase, currentIndex, goal, matching.bestScore, mmsettings);
           break;
         case MotionMatchingSolverType::VPTree :
           best_index = solve_motion_matching_vp_tree(dataBase, goal, OptimisationSettings.vpTreeErrorTolerance);

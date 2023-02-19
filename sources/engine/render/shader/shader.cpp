@@ -254,10 +254,10 @@ void update_ssbo(uint ssbo, void *data, uint size, uint offset)
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0); // unbind
 }
 
-void retrieve_ssbo(uint ssbo, void *data, uint size)
+void retrieve_ssbo(uint ssbo, void *data, uint size, uint offset)
 {
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo);
-	glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, size, data);
+	glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, offset, size, data);
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0); // unbind
 }
 
