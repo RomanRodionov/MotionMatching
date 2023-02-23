@@ -71,28 +71,24 @@ struct IdentifiedGoal
   AnimationGoal goal;
   uint curClip, curCadr;
   MatchingScores best_score;
-  ecs::EntityId eid;
+  int charId;
 };
 
-constexpr int MIN_QUEUE_SIZE = 100;
-constexpr float WAIT_LIMIT = 0.1f;
+constexpr int MIN_QUEUE_SIZE = 200;
 struct GoalsBuffer : ecs::Singleton
 {
   std::queue<IdentifiedGoal> goals = {};
-  float wait_time = 0;
   uint get_size()
   {
     return goals.size();
   }
   bool ready()
   {
-    return (goals.size() >= MIN_QUEUE_SIZE) || ((Time::time() - wait_time) > WAIT_LIMIT && goals.size() > 0);
+    return goals.size() > 0;
   }
-  void push(AnimationGoal goal, uint curClip, uint curCadr, MatchingScores best_score, ecs::EntityId eid)
+  void push(AnimationGoal goal, uint curClip, uint curCadr, MatchingScores best_score, int charId)
   {
-    if (goals.size() % MIN_QUEUE_SIZE == 0)
-      wait_time = Time::time();
-    goals.push({goal, curClip, curCadr, best_score, eid});
+    goals.push({goal, curClip, curCadr, best_score, charId});
   }
   IdentifiedGoal get()
   {
@@ -104,23 +100,23 @@ struct GoalsBuffer : ecs::Singleton
 
 struct ResultsBuffer : ecs::Singleton
 {
-  std::map<ecs::EntityId, AnimationIndex> results;
-  std::map<ecs::EntityId, MatchingScores> scores;
-  bool ready(ecs::EntityId eid)
+  std::map<int, AnimationIndex> results;
+  std::map<int, MatchingScores> scores;
+  bool ready(int charId)
   {
-    return results.find(eid) != results.end();
+    return results.find(charId) != results.end();
   }
-  void push(AnimationIndex result, MatchingScores best_score, ecs::EntityId eid)
+  void push(AnimationIndex result, MatchingScores best_score, int charId)
   {
-    results[eid] = result;
-    scores[eid] = best_score;
+    results[charId] = result;
+    scores[charId] = best_score;
   }
-  AnimationIndex get(ecs::EntityId eid, MatchingScores &best_score)
+  AnimationIndex get(int charId, MatchingScores &best_score)
   {
-    AnimationIndex front_element = results[eid];
-    results.erase(eid);
-    best_score = scores[eid];
-    scores.erase(eid);
+    AnimationIndex front_element = results[charId];
+    results.erase(charId);
+    best_score = scores[charId];
+    scores.erase(charId);
     return front_element;
   }
 };
@@ -181,7 +177,7 @@ SYSTEM(stage=act;before=animation_player_update;after=motion_matching_update) mo
     compute_shader.set_float("realism", mmsettings.realism);
     compute_shader.set_int("queue_shift", cs_data.resSize);
     vector<IdentifiedGoal> goals;
-    debug_log("%d\n", goal_buffer.get_size());
+    //debug_log("%d\n", goal_buffer.get_size());
     while(goal_buffer.ready())
     {
       uint queue_size = goal_buffer.get_size();
@@ -244,12 +240,12 @@ SYSTEM(stage=act;before=animation_player_update;after=motion_matching_update) mo
           goals[idx].best_score.trajectory_v = best_matching.trajectory_v;
           goals[idx].best_score.trajectory_w = best_matching.trajectory_w;
           result_buffer.push(AnimationIndex(dataBase, clip_idx, best_matching.idx - cs_data.clip_labels[clip_idx]), 
-              goals[idx].best_score, goals[idx].eid);
+              goals[idx].best_score, goals[idx].charId);
         }
         else
         {
           result_buffer.push(AnimationIndex(dataBase, goals[idx].curClip, goals[idx].curCadr), 
-              goals[idx].best_score, goals[idx].eid);
+              goals[idx].best_score, goals[idx].charId);
         }
       }
       goals.clear();
@@ -298,7 +294,7 @@ SYSTEM(stage=act;before=animation_player_update) motion_matching_update(
   const MainCamera &mainCamera,
   GoalsBuffer &goal_buffer,
   ResultsBuffer &result_buffer,
-  ecs::EntityId &eid)
+  int &charId)
 {
   float dt = Time::delta_time();
   
@@ -365,10 +361,11 @@ SYSTEM(stage=act;before=animation_player_update) motion_matching_update(
           best_index = solve_motion_matching(dataBase, currentIndex, goal, matching.bestScore, mmsettings);
           break;
         case MotionMatchingSolverType::CSBruteForce :
-          goal_buffer.push(goal, currentIndex.get_clip_index(), currentIndex.get_cadr_index(), matching.bestScore, eid);
-          if (result_buffer.ready(eid))
+          debug_log("%d", charId);
+          goal_buffer.push(goal, currentIndex.get_clip_index(), currentIndex.get_cadr_index(), matching.bestScore, charId);
+          if (result_buffer.ready(charId))
           {
-            best_index = result_buffer.get(eid, matching.bestScore);
+            best_index = result_buffer.get(charId, matching.bestScore);
           }
           else
           {

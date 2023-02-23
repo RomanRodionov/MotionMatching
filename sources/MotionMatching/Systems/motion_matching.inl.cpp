@@ -57,7 +57,7 @@ ecs::SystemDescription motion_matching_update_descr("motion_matching_update", {
   {ecs::get_type_description<MainCamera>("mainCamera"), false},
   {ecs::get_type_description<GoalsBuffer>("goal_buffer"), false},
   {ecs::get_type_description<ResultsBuffer>("result_buffer"), false},
-  {ecs::get_type_description<ecs::EntityId>("eid"), false}
+  {ecs::get_type_description<int>("charId"), false}
 }, {
 }, {},
 {"animation_player_update"},

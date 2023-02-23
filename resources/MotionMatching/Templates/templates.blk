@@ -37,6 +37,7 @@ animated_char {
   personController:PersonController { }
   updateMMStatistic:b = false;
   mmOptimisationIndex:i=7;
+  charId:i=0;
 }
 
 
