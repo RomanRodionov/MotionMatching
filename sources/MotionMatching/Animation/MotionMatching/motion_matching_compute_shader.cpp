@@ -41,11 +41,10 @@ void store_database(AnimationDataBasePtr dataBase, const MotionMatchingSettings 
   store_ssbo(feature_ssbo, featureData.data(), sizeof(FeatureCell) * featuresCounter);
 }
 
-void store_goal_feature(const AnimationGoal& goal, const MotionMatchingSettings &mmsettings, uint uboBlock)
+void pack_goal_feature(const AnimationGoal& goal, const MotionMatchingSettings &mmsettings, FeatureCell& goal_feature)
 {
   float poseWeight = mmsettings.poseMatchingWeight;
   float velocityWeight = mmsettings.velocityMatchingWeight;
-  FeatureCell goal_feature;
   for (uint node = 0; node < (uint)AnimationFeaturesNode::Count; node++)
   {
     goal_feature.nodes[node] = vec4(goal.feature.features.nodes[node] * float(mmsettings.nodeWeights[node]) * poseWeight, 0);
@@ -61,7 +60,6 @@ void store_goal_feature(const AnimationGoal& goal, const MotionMatchingSettings 
     goal_feature.angularVelocity[point] = goal.feature.trajectory.trajectory[point].angularVelocity * mmsettings.goalAngularVelocityWeight;
   }
   goal_feature.tags = goal.tags.tags;
-  store_ubo(uboBlock, &goal_feature, sizeof(FeatureCell));
 }
 
 AnimationIndex solve_motion_matching_cs(

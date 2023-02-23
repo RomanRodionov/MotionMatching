@@ -44,9 +44,9 @@ layout(std430, binding = 1) buffer result_data
 {
     MatchingScores results[];
 };
-layout (std140, binding = 2) uniform DataBlock
+layout (std430, binding = 2) buffer DataBlock
 {
-    FeatureCell goal_data;
+    FeatureCell goal_data[];
 };  
 
 uniform int data_size;
@@ -116,8 +116,8 @@ void main()
   min_scores[gl_LocalInvocationID.x].full_score = INF;
   for (uint i = 0; (i < iterations) && (gl_GlobalInvocationID.x * iterations + i < data_size); i++)
   {
-    score = get_score(feature[gl_GlobalInvocationID.x * iterations + i], goal_data);
-    if (has_goal_tags(goal_data.tags, feature[gl_GlobalInvocationID.x * iterations + i].tags) && 
+    score = get_score(feature[gl_GlobalInvocationID.x * iterations + i], goal_data[queue_index]);
+    if (has_goal_tags(goal_data[queue_index].tags, feature[gl_GlobalInvocationID.x * iterations + i].tags) && 
             min_scores[gl_LocalInvocationID.x].full_score > score.full_score)
     {
       score.idx = gl_GlobalInvocationID.x * iterations + i;

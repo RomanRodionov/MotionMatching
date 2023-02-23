@@ -74,7 +74,7 @@ struct IdentifiedGoal
   int charId;
 };
 
-constexpr int MIN_QUEUE_SIZE = 200;
+constexpr int MIN_QUEUE_SIZE = 500;
 struct GoalsBuffer : ecs::Singleton
 {
   std::queue<IdentifiedGoal> goals = {};
@@ -123,7 +123,7 @@ struct ResultsBuffer : ecs::Singleton
 
 struct CSData : ecs::Singleton
 {
-  uint feature_ssbo, result_ssbo, goal_ubo, group_size = 256;
+  uint feature_ssbo, result_ssbo, goal_ssbo, group_size = 256;
   glm::uvec2 dispatch_size = {4, 1};
   uint invocations = dispatch_size.x * dispatch_size.y * group_size;
   vector<uint> clip_labels;
@@ -144,7 +144,7 @@ SYSTEM(stage=act;before=motion_matching_cs_update, motion_matching_update) init_
     const MotionMatchingSettings &mmsettings = settingsContainer.motionMatchingSettings[mmIndex ? *mmIndex : 0].second;
     cs_data.feature_ssbo = create_ssbo(0);
     cs_data.result_ssbo = create_ssbo(1);
-    cs_data.goal_ubo = create_ubo(2);
+    cs_data.goal_ssbo = create_ssbo(2);
     store_database(dataBase, mmsettings, cs_data.clip_labels, cs_data.feature_ssbo, cs_data.dataSize);
     cs_data.iterations = cs_data.dataSize / cs_data.invocations;
     if (cs_data.dataSize % cs_data.invocations > 0) cs_data.iterations++;
@@ -152,6 +152,7 @@ SYSTEM(stage=act;before=motion_matching_cs_update, motion_matching_update) init_
     if (cs_data.dataSize % (cs_data.iterations * cs_data.group_size) > 0) cs_data.resSize++;
     cs_data.scores = new ShaderMatchingScores[MIN_QUEUE_SIZE * cs_data.resSize];
     store_ssbo(cs_data.result_ssbo, NULL, MIN_QUEUE_SIZE * cs_data.resSize * sizeof(ShaderMatchingScores));
+    store_ssbo(cs_data.goal_ssbo, NULL, MIN_QUEUE_SIZE * sizeof(FeatureCell));
     cs_data.initialized = true;
     debug_log("cs data have been initialized");
   }
@@ -177,25 +178,32 @@ SYSTEM(stage=act;before=animation_player_update;after=motion_matching_update) mo
     compute_shader.set_float("realism", mmsettings.realism);
     compute_shader.set_int("queue_shift", cs_data.resSize);
     vector<IdentifiedGoal> goals;
+    vector<FeatureCell> featureData;
     //debug_log("%d\n", goal_buffer.get_size());
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, cs_data.feature_ssbo);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, cs_data.result_ssbo);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, cs_data.goal_ssbo);
     while(goal_buffer.ready())
     {
       uint queue_size = goal_buffer.get_size();
+      featureData.clear();
+      goals.clear();
+      for (uint idx = 0; idx < MIN_QUEUE_SIZE && idx < queue_size; ++idx)
+      {
+        IdentifiedGoal goal = goal_buffer.get();
+        goals.push_back(goal);
+        FeatureCell goal_feature;
+        pack_goal_feature(goal.goal, mmsettings, goal_feature);
+        featureData.push_back(goal_feature);
+      }
+      store_ssbo(cs_data.goal_ssbo, featureData.data(), sizeof(FeatureCell) * featureData.size());
       for (uint idx = 0; idx < MIN_QUEUE_SIZE && idx < queue_size; ++idx)
       {
         compute_shader.set_int("queue_index", idx);
-        IdentifiedGoal goal = goal_buffer.get();
-        goals.push_back(goal);
-        store_goal_feature(goal.goal, mmsettings, cs_data.goal_ubo);
-
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, cs_data.feature_ssbo);
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, cs_data.result_ssbo);
-        glBindBufferBase(GL_UNIFORM_BUFFER, 2, cs_data.goal_ubo);
-
         compute_shader.dispatch(cs_data.dispatch_size);
         compute_shader.wait();
       }
-      retrieve_ssbo(cs_data.result_ssbo, cs_data.scores, MIN_QUEUE_SIZE * cs_data.resSize * sizeof(ShaderMatchingScores));
+      retrieve_ssbo(cs_data.result_ssbo, cs_data.scores, featureData.size() * cs_data.resSize * sizeof(ShaderMatchingScores));
       ShaderMatchingScores best_matching;
       for (uint idx = 0; idx < MIN_QUEUE_SIZE && idx < queue_size; ++idx)
       {
@@ -248,7 +256,6 @@ SYSTEM(stage=act;before=animation_player_update;after=motion_matching_update) mo
               goals[idx].best_score, goals[idx].charId);
         }
       }
-      goals.clear();
     }
   }
 }
@@ -361,7 +368,7 @@ SYSTEM(stage=act;before=animation_player_update) motion_matching_update(
           best_index = solve_motion_matching(dataBase, currentIndex, goal, matching.bestScore, mmsettings);
           break;
         case MotionMatchingSolverType::CSBruteForce :
-          debug_log("%d", charId);
+          //debug_log("%d", charId);
           goal_buffer.push(goal, currentIndex.get_clip_index(), currentIndex.get_cadr_index(), matching.bestScore, charId);
           if (result_buffer.ready(charId))
           {

@@ -54,3 +54,4 @@ struct ShaderMatchingScores
 
 void store_database(AnimationDataBasePtr dataBase, const MotionMatchingSettings &mmsettings, vector<uint> &labels, uint feature_ssbo, int &size);
 void store_goal_feature(const AnimationGoal& goal, const MotionMatchingSettings &mmsettings, uint uboBlock);
+void pack_goal_feature(const AnimationGoal& goal, const MotionMatchingSettings &mmsettings, FeatureCell& goal_feature);
