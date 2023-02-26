@@ -5,7 +5,7 @@
 
 
 #define INF 1e16
-#define GROUP_SIZE 256
+#define GROUP_SIZE 32
 
 const uint nodesCount = 4;
 const uint pathLength = 3;
@@ -46,17 +46,19 @@ layout(std430, binding = 1) buffer result_data
 {
     MatchingScores results[];
 };
-layout (std140, binding = 2) uniform DataBlock
+layout (std430, binding = 2) buffer DataBlock
 {
-    FeatureCell goal_data;
+    FeatureCell goal_data[];
 };  
 
 uniform int data_size;
 uniform int iterations;
 uniform float goalPathMatchingWeight;
 uniform float realism;
-
-
+uniform int queue_shift;
+//uniform int queue_index;
+uniform int y_size;
+uniform int queue_size;
 
 float pose_matching_norma(in FeatureCell feature, in FeatureCell goal)
 {
@@ -114,38 +116,40 @@ shared MatchingScores min_scores[GROUP_SIZE];
 
 void main()
 {
-  MatchingScores score;
-  min_scores[gl_LocalInvocationID.x].full_score = INF;
-  for (uint i = 0; (i < iterations) && (gl_GlobalInvocationID.x * iterations + i < data_size); i++)
+  int queue_index = (int)gl_GlobalInvocationID.y;
+  while (queue_index < queue_size)
   {
-    score = get_score(feature[gl_GlobalInvocationID.x * iterations + i], goal_data);
-    if (has_goal_tags(goal_data.tags, feature[gl_GlobalInvocationID.x * iterations + i].tags) && 
-            min_scores[gl_LocalInvocationID.x].full_score > score.full_score)
+    MatchingScores score;
+    min_scores[gl_LocalInvocationID.x].full_score = INF;
+    for (uint i = 0; (i < iterations) && (gl_GlobalInvocationID.x * iterations + i < data_size); i++)
     {
-      score.idx = gl_GlobalInvocationID.x * iterations + i;
-      min_scores[gl_LocalInvocationID.x] = score;
+      score = get_score(feature[gl_GlobalInvocationID.x * iterations + i], goal_data[queue_index]);
+      if (has_goal_tags(goal_data[queue_index].tags, feature[gl_GlobalInvocationID.x * iterations + i].tags) && 
+              min_scores[gl_LocalInvocationID.x].full_score > score.full_score)
+      {
+        score.idx = gl_GlobalInvocationID.x * iterations + i;
+        min_scores[gl_LocalInvocationID.x] = score;
+      }
     }
-  }
-  uint step = GROUP_SIZE / 2;
-  uint arr_size = data_size / iterations;
-  if (arr_size % iterations > 0)
-    arr_size++;
-  memoryBarrierShared();
-  barrier();
-  int qq = 1;
-  atomicMax(min_scores[0], qq);
-
-  while (step > 0) {
-    if ((gl_LocalInvocationID.x < step) && (gl_GlobalInvocationID.x + step < arr_size)) 
-      if (min_scores[gl_LocalInvocationID.x + step].full_score < min_scores[gl_LocalInvocationID.x].full_score) 
-        min_scores[gl_LocalInvocationID.x] = min_scores[gl_LocalInvocationID.x + step];
-    step /= 2;
+    uint step = GROUP_SIZE / 2;
+    uint arr_size = data_size / iterations;
+    if (arr_size % iterations > 0)
+      arr_size++;
     memoryBarrierShared();
     barrier();
-  }
-  if (gl_LocalInvocationID.x == 0)
-    results[gl_WorkGroupID.x] = min_scores[0];
-    
+
+    while (step > 0) {
+      if ((gl_LocalInvocationID.x < step) && (gl_GlobalInvocationID.x + step < arr_size)) 
+        if (min_scores[gl_LocalInvocationID.x + step].full_score < min_scores[gl_LocalInvocationID.x].full_score) 
+          min_scores[gl_LocalInvocationID.x] = min_scores[gl_LocalInvocationID.x + step];
+      step /= 2;
+      memoryBarrierShared();
+      barrier();
+    }
+    if (gl_LocalInvocationID.x == 0)
+      results[queue_index * queue_shift + gl_WorkGroupID.x] = min_scores[0];
+    queue_index += y_size;
+  } 
   memoryBarrierShared();
   barrier();
 }
