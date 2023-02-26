@@ -177,9 +177,6 @@ SYSTEM(stage=act;before=animation_player_update;after=motion_matching_update) mo
     compute_shader.set_int("iterations", cs_data.iterations);
     compute_shader.set_float("goalPathMatchingWeight", mmsettings.goalPathMatchingWeight);
     compute_shader.set_float("realism", mmsettings.realism);
-    compute_shader.set_int("queue_shift", cs_data.resSize);
-    //compute_shader.set_int("queue_index", 0);
-    compute_shader.set_int("y_size", cs_data.dispatch_size.y);
     vector<IdentifiedGoal> goals;
     vector<FeatureCell> featureData;
     //debug_log("%d\n", goal_buffer.get_size());
