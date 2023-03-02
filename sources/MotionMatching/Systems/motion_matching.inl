@@ -149,8 +149,7 @@ SYSTEM(stage=act;before=motion_matching_cs_update, motion_matching_update) init_
     store_database(dataBase, mmsettings, cs_data.clip_labels, cs_data.feature_ssbo, cs_data.dataSize);
     cs_data.iterations = cs_data.dataSize / cs_data.invocations;
     if (cs_data.dataSize % cs_data.invocations > 0) cs_data.iterations++;
-    cs_data.resSize = cs_data.dispatch_size.x;//.dataSize / (cs_data.iterations * cs_data.group_size);
-    //if (cs_data.dataSize % (cs_data.iterations * cs_data.group_size) > 0) cs_data.resSize++;
+    cs_data.resSize = cs_data.dispatch_size.x;
     cs_data.scores = new ShaderMatchingScores[MAX_QUEUE_SIZE * cs_data.resSize];
     store_ssbo(cs_data.result_ssbo, NULL, MAX_QUEUE_SIZE * cs_data.resSize * sizeof(ShaderMatchingScores));
     store_ssbo(cs_data.goal_ssbo, NULL, MAX_QUEUE_SIZE * sizeof(FeatureCell));
@@ -159,7 +158,7 @@ SYSTEM(stage=act;before=motion_matching_cs_update, motion_matching_update) init_
   }
 }
 
-SYSTEM(stage=act;before=animation_player_update;after=motion_matching_update) motion_matching_cs_update(
+SYSTEM(stage=before_render;) motion_matching_cs_update(
   Asset<AnimationDataBase> &dataBase,
   bool &mm_mngr,
   GoalsBuffer &goal_buffer,
@@ -207,7 +206,7 @@ SYSTEM(stage=act;before=animation_player_update;after=motion_matching_update) mo
       ShaderMatchingScores best_matching;
       for (uint idx = 0; idx < queue_size; ++idx)
       {
-        best_matching = cs_data.scores[0];
+        best_matching = cs_data.scores[cs_data.resSize * idx];
         for (int i = 1; i < cs_data.resSize; ++i)
         {
           if (cs_data.scores[cs_data.resSize * idx + i].full_score < best_matching.full_score)

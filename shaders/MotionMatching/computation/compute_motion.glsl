@@ -154,5 +154,4 @@ void main()
       results[queue_index * gl_NumWorkGroups.x + gl_WorkGroupID.x] = min_scores[0];
     queue_index += gl_NumWorkGroups.y;
   }
-  barrier();
 }

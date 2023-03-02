@@ -33,9 +33,9 @@ ecs::SystemDescription motion_matching_cs_update_descr("motion_matching_cs_updat
   {ecs::get_type_description<int>("mmIndex"), true}
 }, {
 }, {},
-{"animation_player_update"},
-{"motion_matching_update"},
-motion_matching_cs_update_func, "act", {}, false);
+{},
+{},
+motion_matching_cs_update_func, "before_render", {}, false);
 
 void motion_matching_cs_update_func()
 {
