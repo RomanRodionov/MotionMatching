@@ -3,7 +3,7 @@
 #compute_shader
 
 #define INF 1e16
-#define GROUP_SIZE 128
+#define GROUP_SIZE 64
 
 #define NODES_COUNT 4
 #define PATH_LENGTH 3

@@ -7,6 +7,9 @@ void init_cs_data_func();
 ecs::SystemDescription init_cs_data_descr("init_cs_data", {
   {ecs::get_type_description<Asset<AnimationDataBase>>("dataBase"), false},
   {ecs::get_type_description<bool>("mm_mngr"), false},
+  {ecs::get_type_description<int>("groups_per_char"), false},
+  {ecs::get_type_description<int>("parallel_char"), false},
+  {ecs::get_type_description<int>("group_size"), false},
   {ecs::get_type_description<CSData>("cs_data"), false},
   {ecs::get_type_description<SettingsContainer>("settingsContainer"), false},
   {ecs::get_type_description<int>("mmIndex"), true}

@@ -124,9 +124,9 @@ struct ResultsBuffer : ecs::Singleton
 
 struct CSData : ecs::Singleton
 {
-  uint feature_ssbo, result_ssbo, goal_ssbo, group_size = 128;
-  glm::uvec2 dispatch_size = {4, 4};
-  uint invocations = dispatch_size.x * group_size;
+  uint feature_ssbo, result_ssbo, goal_ssbo, group_size;
+  glm::uvec2 dispatch_size;
+  uint invocations;
   vector<uint> clip_labels;
   int dataSize, resSize, iterations;
   ShaderMatchingScores *scores;
@@ -136,12 +136,27 @@ struct CSData : ecs::Singleton
 SYSTEM(stage=act;before=motion_matching_cs_update, motion_matching_update) init_cs_data(
   Asset<AnimationDataBase> &dataBase,
   bool &mm_mngr,
+  int &groups_per_char,
+  int &parallel_char,
+  int &group_size,
   CSData &cs_data,
   SettingsContainer &settingsContainer,
   int *mmIndex)
 {
   if (!cs_data.initialized)
   {
+    cs_data.dispatch_size = {groups_per_char, parallel_char};
+    for (int i = 0; i < 2; ++i)
+    {
+      int max_dispatch;
+      glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 0, &max_dispatch);
+      if (max_dispatch < cs_data.dispatch_size[i])
+      {
+        cs_data.dispatch_size[i] = max_dispatch;
+      }
+    }
+    cs_data.invocations = cs_data.dispatch_size.x * group_size;
+    cs_data.group_size = group_size;
     const MotionMatchingSettings &mmsettings = settingsContainer.motionMatchingSettings[mmIndex ? *mmIndex : 0].second;
     cs_data.feature_ssbo = create_ssbo(0);
     cs_data.result_ssbo = create_ssbo(1);

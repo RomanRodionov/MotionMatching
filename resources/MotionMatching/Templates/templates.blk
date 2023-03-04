@@ -7,7 +7,10 @@ mm_manager {
   recorderStartTime:f = 0;
   testers:vector<EntityId> {}
   tests:vector<AnimationTest> {}
-  mm_mngr:b=true;
+  groups_per_char:i = 4;
+  parallel_char:i = 4;
+  group_size:i = 64;
+  mm_mngr:b = true;
 }
 
 animated_char {
