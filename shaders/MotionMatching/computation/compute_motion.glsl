@@ -3,7 +3,7 @@
 #compute_shader
 
 #define INF 1e16
-#define GROUP_SIZE 64
+#define GROUP_SIZE 32
 
 #define NODES_COUNT 4
 #define PATH_LENGTH 3
@@ -135,18 +135,18 @@ void main()
         }
       }
     }
-    uint step = GROUP_SIZE / 2;
+    uint step = 1;
     uint arr_size = data_size / iterations;
     if (arr_size % iterations > 0)
       arr_size++;
     memoryBarrierShared();
     barrier();
    
-    while (step > 0) {
-      if ((gl_LocalInvocationID.x < step) && (gl_LocalInvocationID.x + step < arr_size)) 
+    while (step < GROUP_SIZE) {
+      if ((gl_LocalInvocationID.x + step < arr_size) && (gl_LocalInvocationID.x % (step * 2) == 0)) 
         if (min_scores[gl_LocalInvocationID.x + step].full_score < min_scores[gl_LocalInvocationID.x].full_score) 
           min_scores[gl_LocalInvocationID.x] = min_scores[gl_LocalInvocationID.x + step];
-      step /= 2;
+      step *= 2;
       memoryBarrierShared();
       barrier();
     }
