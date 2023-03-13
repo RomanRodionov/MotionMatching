@@ -1,3 +1,11 @@
+#define MICROPROFILE_IMPL
+#define MICROPROFILEUI_IMPL
+#define MICROPROFILEDRAW_IMPL
+#define MICROPROFILE_GPU_TIMERS_GL 1
+
+#define WIDTH 1024
+#define HEIGHT 600
+
 #include "application_data.h"
 #include "application.h"
 #include "render/shader/shader_factory.h"
@@ -10,6 +18,10 @@
 #include "ecs/ecs_scene.h"
 #include "application_metainfo.h"
 #include "memory/tmp_allocator.h"
+#include "microprofile/microprofile.h"
+#include "microprofile/microprofileui.h"
+#include "microprofile/microprofiledraw.h"
+
 namespace ecs
 {
   void load_templates_from_blk();
@@ -90,6 +102,9 @@ bool Application::sdl_event_handler()
   }
   return running;
 }
+
+void MicroProfileDrawInit();
+
 void Application::main_loop()
 {
   bool running = true;
@@ -109,6 +124,12 @@ void Application::main_loop()
     PROFILER(sdl_events) 
 		running = sdl_event_handler();
     sdl_events.stop();
+
+    MicroProfileGpuInitGL();
+    MicroProfileInitUI();
+    MicroProfileDrawInit();
+    MicroProfileToggleDisplayMode();
+    MicroProfileOnThreadCreate("main");
     if (running)
     {
       PROFILER(ecs_events);
@@ -141,6 +162,10 @@ void Application::main_loop()
       ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
       imgui_render.stop();
       ui.stop();
+
+      MicroProfileBeginDraw(WIDTH, HEIGHT, 1.f);
+			MicroProfileDraw(WIDTH, HEIGHT);
+			MicroProfileEndDraw();
     }
     main_loop.stop();
 	}

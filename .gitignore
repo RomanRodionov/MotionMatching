@@ -17,6 +17,7 @@
 
 
 Builds/*
+sources/3rd_party/include/*
 
 # Precompiled Headers
 *.gch
