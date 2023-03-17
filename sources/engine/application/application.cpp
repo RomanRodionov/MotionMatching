@@ -1,11 +1,3 @@
-#define MICROPROFILE_IMPL
-#define MICROPROFILEUI_IMPL
-#define MICROPROFILEDRAW_IMPL
-#define MICROPROFILE_GPU_TIMERS_GL 1
-
-#define WIDTH 1024
-#define HEIGHT 600
-
 #include "application_data.h"
 #include "application.h"
 #include "render/shader/shader_factory.h"
@@ -18,9 +10,7 @@
 #include "ecs/ecs_scene.h"
 #include "application_metainfo.h"
 #include "memory/tmp_allocator.h"
-#include "microprofile/microprofile.h"
-#include "microprofile/microprofileui.h"
-#include "microprofile/microprofiledraw.h"
+#include "microprofile_support.h"
 
 namespace ecs
 {
@@ -63,6 +53,16 @@ void Application::start()
   get_cpu_profiler();
   get_gpu_profiler();
 
+  MicroProfileGpuInitGL();
+  MicroProfileWebServerStart();
+  MicroProfileOnThreadCreate("Main");
+    //turn on profiling
+	MicroProfileSetForceEnable(true);
+	MicroProfileSetEnableAllGroups(true);
+	MicroProfileSetForceMetaCounters(true);
+
+  MICROPROFILE_COUNTER_ADD("memory/main", 1000);
+
   scene->start_scene(root_path(metaInfo.firstScene.c_str()), editor);
 }
 bool Application::sdl_event_handler()
@@ -103,13 +103,16 @@ bool Application::sdl_event_handler()
   return running;
 }
 
-void MicroProfileDrawInit();
+//void MicroProfileDrawInit();
 
 void Application::main_loop()
-{
+{  
+
+  
   bool running = true;
   while (running)
   {
+    MICROPROFILE_SCOPE(MAIN);
     clear_tmp_allocation();
     get_cpu_profiler().start_frame();
     PROFILER(main_loop);
@@ -125,11 +128,6 @@ void Application::main_loop()
 		running = sdl_event_handler();
     sdl_events.stop();
 
-    MicroProfileGpuInitGL();
-    MicroProfileInitUI();
-    MicroProfileDrawInit();
-    MicroProfileToggleDisplayMode();
-    MicroProfileOnThreadCreate("main");
     if (running)
     {
       PROFILER(ecs_events);
@@ -146,6 +144,7 @@ void Application::main_loop()
       context.swap_buffer();
       swapchain.stop();
       ProfilerLabelGPU frame_label("frame");
+      MICROPROFILE_SCOPEGPUI("frame", 0x0000ff);
       PROFILER(ecs_render);
       scene->update_render();
       ecs_render.stop();
@@ -157,21 +156,28 @@ void Application::main_loop()
       ecs_ui.stop();
       
       ProfilerLabelGPU imgui_render_label("imgui_render");
+      MICROPROFILE_SCOPEGPUI("imgui_render", 0x0000ff);
       PROFILER(imgui_render);
       ImGui::Render();
       ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
       imgui_render.stop();
       ui.stop();
 
-      MicroProfileBeginDraw(WIDTH, HEIGHT, 1.f);
-			MicroProfileDraw(WIDTH, HEIGHT);
-			MicroProfileEndDraw();
+      MicroProfileFlip();
+      static bool once = false;
+      if(!once)
+      {
+        once = 1;
+        debug_log("open localhost:%d in chrome to capture profile data\n", MicroProfileWebServerPort());
+      }
     }
     main_loop.stop();
 	}
 }
 void Application::exit()
 {
+  MicroProfileWebServerStop();
+  MicroProfileShutdown();
   save_shader_info();
   scene->destroy_scene();
   save_all_resources_to_metadata();

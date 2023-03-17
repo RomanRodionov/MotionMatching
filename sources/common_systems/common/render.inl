@@ -15,6 +15,7 @@
 #include <render/frustum.h>
 #include <parallel/thread_pool.h>
 #include <type_registration.h>
+#include "microprofile/microprofile.h"
 
 ECS_REGISTER_TYPE_AND_VECTOR(Mesh, Asset<Mesh>); 
 ECS_REGISTER_TYPE(Texture2D, Asset<Texture2D>);
@@ -153,6 +154,7 @@ render_sky_box(SkyBox &skyBox)
 	if ((skyBox.material && skyBox.material.try_load()))
   {
     ProfilerLabelGPU label("skybox");
+    MICROPROFILE_SCOPEGPUI("skybox", 0x0000ff);
     skyBox.render();
   }
 }
@@ -234,6 +236,7 @@ main_instanced_render(EditorRenderSettings &editorSettings, RenderQueue &render)
       if (needRender)
       {
         ProfilerLabelGPU label(stuff.label);
+        MICROPROFILE_SCOPEGPUI(stuff.label, 0x0000ff);
         if (shader.get_shader_program() != sp)//need use new shader
         {
           shader.use();
@@ -314,6 +317,7 @@ render_collision(const EditorRenderSettings &editorSettings)
   if (instanceCount == 0)
     return;
   ProfilerLabelGPU label("collision");
+  MICROPROFILE_SCOPEGPUI("collision", 0x0000ff);
   dynamicTransforms.bind();
   collisionMat->get_shader().use();
   dynamicTransforms.flush_buffer(instanceCount * instanceSize);

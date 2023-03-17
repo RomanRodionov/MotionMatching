@@ -98,7 +98,8 @@
     "format": "cpp",
     "stop_token": "cpp",
     "valarray": "cpp",
-    "variant": "cpp"
+    "variant": "cpp",
+    "miniz.c": "cpp"
   },
   "launchOption.options": {
     "BuildType": [
