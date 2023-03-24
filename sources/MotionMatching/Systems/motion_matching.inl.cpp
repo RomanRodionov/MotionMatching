@@ -36,13 +36,34 @@ ecs::SystemDescription motion_matching_cs_update_descr("motion_matching_cs_updat
   {ecs::get_type_description<int>("mmIndex"), true}
 }, {
 }, {},
-{},
+{"motion_matching_cs_retrieve"},
 {},
 motion_matching_cs_update_func, "before_render", {}, false);
 
 void motion_matching_cs_update_func()
 {
   ecs::perform_system(motion_matching_cs_update_descr, motion_matching_cs_update);
+}
+
+void motion_matching_cs_retrieve_func();
+
+ecs::SystemDescription motion_matching_cs_retrieve_descr("motion_matching_cs_retrieve", {
+  {ecs::get_type_description<Asset<AnimationDataBase>>("dataBase"), false},
+  {ecs::get_type_description<bool>("mm_mngr"), false},
+  {ecs::get_type_description<GoalsBuffer>("goal_buffer"), false},
+  {ecs::get_type_description<ResultsBuffer>("result_buffer"), false},
+  {ecs::get_type_description<CSData>("cs_data"), false},
+  {ecs::get_type_description<SettingsContainer>("settingsContainer"), false},
+  {ecs::get_type_description<int>("mmIndex"), true}
+}, {
+}, {},
+{},
+{"motion_matching_cs_update"},
+motion_matching_cs_retrieve_func, "before_render", {}, false);
+
+void motion_matching_cs_retrieve_func()
+{
+  ecs::perform_system(motion_matching_cs_retrieve_descr, motion_matching_cs_retrieve);
 }
 
 void motion_matching_update_func();
