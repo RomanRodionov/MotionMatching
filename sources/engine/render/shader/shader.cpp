@@ -232,11 +232,10 @@ void save_precompiled_shaders(vector<PrecompiledShader> &shaders)
   }
 }
 
-uint create_ssbo(uint binding)
+uint create_ssbo()
 {
 	uint ssbo = 0;
 	glGenBuffers(1, &ssbo);
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, binding, ssbo);
 	return ssbo;
 }
 

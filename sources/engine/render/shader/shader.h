@@ -132,7 +132,7 @@ public:
   }
 };
 
-uint create_ssbo(uint binding = 0);
+uint create_ssbo();
 void store_ssbo(uint ssbo, void *data, uint size);
 void update_ssbo(uint ssbo, void *data, uint size, uint offset=0);
 void retrieve_ssbo(uint ssbo, void *data, uint size, uint offset = 0);

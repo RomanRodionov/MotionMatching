@@ -123,9 +123,68 @@ struct ResultsBuffer : ecs::Singleton
   }
 };
 
+class BuffersParity
+{
+  vector<uint> goal_ssbo, result_ssbo, occupancy;
+  uint goal_init_size, result_init_size, index;
+public:
+  BuffersParity()
+  {
+    goal_init_size = 0;
+    result_init_size = 0;
+    index = 0;
+  }
+  void init_size(uint goal_size, uint result_size)
+  {
+    goal_init_size = goal_size;
+    result_init_size = result_size;
+  }
+  void create_pair()
+  {
+    uint g_ssbo = create_ssbo();
+    uint r_ssbo = create_ssbo();
+    result_ssbo.push_back(r_ssbo);
+    goal_ssbo.push_back(g_ssbo);
+    store_ssbo(r_ssbo, NULL, result_init_size);
+    store_ssbo(g_ssbo, NULL, goal_init_size);
+    occupancy.push_back(0);
+  }
+  uint get_goal()
+  {
+    return goal_ssbo[index];
+  }
+  uint get_result()
+  {
+    return result_ssbo[index];
+  }
+  void store_goal(void *data, uint item_size, uint item_count)
+  {
+    store_ssbo(goal_ssbo[index], data, item_size * item_count);
+    //debug_log("%d %d %d %d\n", index, goal_ssbo.size(), item_size, item_count);
+    occupancy[index] = item_count;
+  }
+  void retrieve_result(void *data, uint item_size)
+  {
+    //debug_log("%d\n", occupancy[index]);
+    retrieve_ssbo(result_ssbo[index], data, item_size * occupancy[index]);
+  }
+  void bind_pair(uint idx, uint goal_binding, uint result_binding)
+  {
+    while (idx >= goal_ssbo.size())
+    {
+      debug_log("--__--\n");
+      create_pair();
+    }
+    index = idx;
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, result_binding, result_ssbo[index]);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, goal_binding, goal_ssbo[index]);
+  }
+};
+
 struct CSData : ecs::Singleton
 {
-  uint feature_ssbo, result_ssbo, goal_ssbo, group_size;
+  uint feature_ssbo, group_size;
+  BuffersParity buffers_parity;
   glm::uvec2 dispatch_size;
   uint invocations;
   vector<uint> clip_labels;
@@ -150,7 +209,7 @@ SYSTEM(stage=act;before=motion_matching_cs_update, motion_matching_update) init_
     for (int i = 0; i < 2; ++i)
     {
       int max_dispatch;
-      glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 0, &max_dispatch);
+      glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, i, &max_dispatch);
       if (max_dispatch < cs_data.dispatch_size[i])
       {
         cs_data.dispatch_size[i] = max_dispatch;
@@ -159,18 +218,16 @@ SYSTEM(stage=act;before=motion_matching_cs_update, motion_matching_update) init_
     cs_data.invocations = cs_data.dispatch_size.x * group_size;
     cs_data.group_size = group_size;
     const MotionMatchingSettings &mmsettings = settingsContainer.motionMatchingSettings[mmIndex ? *mmIndex : 0].second;
-    cs_data.feature_ssbo = create_ssbo(0);
-    cs_data.result_ssbo = create_ssbo(1);
-    cs_data.goal_ssbo = create_ssbo(2);
+    cs_data.feature_ssbo = create_ssbo();
     store_database(dataBase, mmsettings, cs_data.clip_labels, cs_data.feature_ssbo, cs_data.dataSize);
     cs_data.iterations = cs_data.dataSize / cs_data.invocations;
     if (cs_data.dataSize % cs_data.invocations > 0) cs_data.iterations++;
     cs_data.resSize = cs_data.dispatch_size.x;
     cs_data.scores = new ShaderMatchingScores[MAX_QUEUE_SIZE * cs_data.resSize];
-    store_ssbo(cs_data.result_ssbo, NULL, MAX_QUEUE_SIZE * cs_data.resSize * sizeof(ShaderMatchingScores));
-    store_ssbo(cs_data.goal_ssbo, NULL, MAX_QUEUE_SIZE * sizeof(FeatureCell));
+    cs_data.buffers_parity.init_size(MAX_QUEUE_SIZE * sizeof(FeatureCell), MAX_QUEUE_SIZE * cs_data.resSize * sizeof(ShaderMatchingScores));
+    cs_data.buffers_parity.create_pair();
     cs_data.initialized = true;
-    debug_log("cs data have been initialized");
+    debug_log("cs data was initialized");
   }
 }
 
@@ -196,11 +253,11 @@ SYSTEM(stage=before_render;) motion_matching_cs_update(
     vector<IdentifiedGoal> goals;
     vector<FeatureCell> featureData;
     //debug_log("%d\n", goal_buffer.get_size());
+    uint step = 0;
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, cs_data.feature_ssbo);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, cs_data.result_ssbo);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, cs_data.goal_ssbo);
-    while(goal_buffer.ready())
+    while(goal_buffer.ready() && step <= 3)
     {        
+      cs_data.buffers_parity.bind_pair(step, 2, 1);
       uint queue_size = goal_buffer.get_size() < MAX_QUEUE_SIZE ? goal_buffer.get_size() : MAX_QUEUE_SIZE;
       compute_shader.set_int("queue_size", queue_size);
       featureData.clear();
@@ -213,7 +270,7 @@ SYSTEM(stage=before_render;) motion_matching_cs_update(
         pack_goal_feature(goal.goal, mmsettings, goal_feature);
         featureData.push_back(goal_feature);
       }
-      store_ssbo(cs_data.goal_ssbo, featureData.data(), sizeof(FeatureCell) * featureData.size());
+      cs_data.buffers_parity.store_goal(featureData.data(), sizeof(FeatureCell), featureData.size());
       {
         ProfilerLabelGPU label("dispatch cs");
         MICROPROFILE_SCOPEGPUI("mm_shader", 0xff0f0f);
@@ -222,7 +279,7 @@ SYSTEM(stage=before_render;) motion_matching_cs_update(
       }
       {
         MICROPROFILE_SCOPEGPUI("retrieve_mm_from_shader", 0xff0f0f);
-        retrieve_ssbo(cs_data.result_ssbo, cs_data.scores, featureData.size() * cs_data.resSize * sizeof(ShaderMatchingScores));
+        cs_data.buffers_parity.retrieve_result(cs_data.scores, cs_data.resSize * sizeof(ShaderMatchingScores));
       }
       ShaderMatchingScores best_matching;
       {
@@ -279,6 +336,7 @@ SYSTEM(stage=before_render;) motion_matching_cs_update(
           }
         }
       }
+      step++;
     }
   }
 }

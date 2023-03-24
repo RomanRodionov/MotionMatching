@@ -85,7 +85,7 @@ SYSTEM(stage=render; before=frustum_culling; scene=game, editor;job=true) lod_se
       break;
     }
   }
-  lod = glm::min(lods_distances.size(), lods_meshes.size()) - 1;
+  //lod = glm::min(lods_distances.size(), lods_meshes.size()) - 1;
   if (lod < lods_meshes.size())
   {
     mesh = lods_meshes[lod];
