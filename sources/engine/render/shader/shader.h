@@ -133,7 +133,7 @@ public:
 };
 
 uint create_ssbo();
-void store_ssbo(uint ssbo, void *data, uint size);
+void store_ssbo(uint ssbo, void *data, uint size, GLenum usage);
 void update_ssbo(uint ssbo, void *data, uint size, uint offset=0);
 void retrieve_ssbo(uint ssbo, void *data, uint size, uint offset = 0);
 

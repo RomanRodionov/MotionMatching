@@ -239,10 +239,10 @@ uint create_ssbo()
 	return ssbo;
 }
 
-void store_ssbo(uint ssbo, void *data, uint size)
+void store_ssbo(uint ssbo, void *data, uint size, GLenum usage)
 {
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo);
-	glBufferData(GL_SHADER_STORAGE_BUFFER, size, data, GL_DYNAMIC_READ);
+	glBufferData(GL_SHADER_STORAGE_BUFFER, size, data, usage);
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0); // unbind
 }
 

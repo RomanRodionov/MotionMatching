@@ -11,7 +11,7 @@ namespace ecs
   class SceneManager
   {
   private:
-    SystemStageInterval act, before_render, render, ui, menu;
+    SystemStageInterval act, before_render, render, ui, menu, animation;
 
     DataBlock rawScene;
     std::string scenePath;
@@ -28,6 +28,7 @@ namespace ecs
     void update_act();
     void update_render();
     void update_ui();
+    void update_animation();
     void process_events();
     void destroy_scene();
   };

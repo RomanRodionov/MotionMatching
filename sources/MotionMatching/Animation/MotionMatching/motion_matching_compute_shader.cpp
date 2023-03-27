@@ -38,7 +38,7 @@ void store_database(AnimationDataBasePtr dataBase, const MotionMatchingSettings 
       size++;
     }
   }
-  store_ssbo(feature_ssbo, featureData.data(), sizeof(FeatureCell) * featuresCounter);
+  store_ssbo(feature_ssbo, featureData.data(), sizeof(FeatureCell) * featuresCounter, GL_STATIC_DRAW);
 }
 
 void pack_goal_feature(const AnimationGoal& goal, const MotionMatchingSettings &mmsettings, FeatureCell& goal_feature)

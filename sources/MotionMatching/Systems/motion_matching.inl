@@ -76,7 +76,7 @@ struct IdentifiedGoal
   int charId;
 };
 
-constexpr int MAX_QUEUE_SIZE = 500;
+constexpr int MAX_QUEUE_SIZE = 5000;
 struct GoalsBuffer : ecs::Singleton
 {
   std::queue<IdentifiedGoal> goals = {};
@@ -146,8 +146,8 @@ public:
     uint r_ssbo = create_ssbo();
     result_ssbo.push_back(r_ssbo);
     goal_ssbo.push_back(g_ssbo);
-    store_ssbo(r_ssbo, NULL, result_init_size);
-    store_ssbo(g_ssbo, NULL, goal_init_size);
+    store_ssbo(r_ssbo, NULL, result_init_size, GL_DYNAMIC_DRAW);
+    store_ssbo(g_ssbo, NULL, goal_init_size, GL_DYNAMIC_READ);
     occupancy.push_back(0);
   }
   uint get_goal()
@@ -160,7 +160,7 @@ public:
   }
   void store_goal(void *data, uint item_size, uint item_count)
   {
-    store_ssbo(goal_ssbo[index], data, item_size * item_count);
+    store_ssbo(goal_ssbo[index], data, item_size * item_count, GL_DYNAMIC_DRAW);
     //debug_log("%d %d %d %d\n", index, goal_ssbo.size(), item_size, item_count);
     occupancy[index] = item_count;
   }
@@ -241,7 +241,7 @@ SYSTEM(stage=act;before=motion_matching_cs_update, motion_matching_update) init_
   }
 }
 
-SYSTEM(stage=before_render;before=motion_matching_cs_retrieve) motion_matching_cs_update(
+SYSTEM(stage=act;) motion_matching_cs_update(
   Asset<AnimationDataBase> &dataBase,
   bool &mm_mngr,
   GoalsBuffer &goal_buffer,
@@ -285,7 +285,11 @@ SYSTEM(stage=before_render;before=motion_matching_cs_retrieve) motion_matching_c
         pack_goal_feature(goal.goal, mmsettings, goal_feature);
         featureData.push_back(goal_feature);
       }
-      cs_data.buffers_parity.store_goal(featureData.data(), sizeof(FeatureCell), featureData.size());
+      {
+        ProfilerLabelGPU label("store goals");
+        MICROPROFILE_SCOPEGPUI("store_goals", 0xff0f0f);
+        cs_data.buffers_parity.store_goal(featureData.data(), sizeof(FeatureCell), featureData.size());
+      }
       {
         ProfilerLabelGPU label("dispatch cs");
         MICROPROFILE_SCOPEGPUI("mm_shader", 0xff0f0f);
@@ -297,7 +301,7 @@ SYSTEM(stage=before_render;before=motion_matching_cs_retrieve) motion_matching_c
   }
 }
 
-SYSTEM(stage=before_render;after=motion_matching_cs_update) motion_matching_cs_retrieve(
+SYSTEM(stage=animation;) motion_matching_cs_retrieve(
   Asset<AnimationDataBase> &dataBase,
   bool &mm_mngr,
   GoalsBuffer &goal_buffer,
@@ -308,7 +312,7 @@ SYSTEM(stage=before_render;after=motion_matching_cs_update) motion_matching_cs_r
 {
   if (cs_data.goals.size() > 0)
   {
-    MICROPROFILE_SCOPEI("MM_CS_UPDATE", "mm_cs_retrieve", 0xff0f0f);
+    MICROPROFILE_SCOPEI("MM_CS_RETRIEVE", "mm_cs_retrieve_function", 0xff1f1f);
     const MotionMatchingSettings &mmsettings = settingsContainer.motionMatchingSettings[mmIndex ? *mmIndex : 0].second;
     auto compute_shader = get_compute_shader("compute_motion");
     compute_shader.use();
@@ -322,6 +326,7 @@ SYSTEM(stage=before_render;after=motion_matching_cs_update) motion_matching_cs_r
         {
           ProfilerLabelGPU label("retrieve cs");
           MICROPROFILE_SCOPEGPUI("retrieve_mm_from_shader", 0xff0f0f);
+          MICROPROFILE_SCOPEI("MM_CS_RETRIEVE", "mm_cs_retrieve", 0xff0f0f);
           cs_data.buffers_parity.retrieve_result(cs_data.scores, cs_data.resSize * sizeof(ShaderMatchingScores), queue_size);
         }
         ShaderMatchingScores best_matching;

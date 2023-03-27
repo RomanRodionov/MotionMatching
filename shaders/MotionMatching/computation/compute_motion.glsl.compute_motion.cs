@@ -5,7 +5,7 @@
 
 
 #define INF 1e16
-#define GROUP_SIZE 128
+#define GROUP_SIZE 32
 
 #define NODES_COUNT 4
 #define PATH_LENGTH 3
@@ -60,7 +60,7 @@ uniform int queue_size;
 float pose_matching_norma(in FeatureCell feature, in FeatureCell goal)
 {
   float pose_norma = 0.f, vel_norma = 0.f;
-  for (int i = 0; i < nodesCount; i++)
+  for (int i = 0; i < NODES_COUNT; i++)
   {
     pose_norma += length(feature.nodes[i] - goal.nodes[i]);
     vel_norma += length(feature.nodesVelocity[i] - goal.nodesVelocity[i]);
@@ -76,8 +76,8 @@ bool has_goal_tags(in Tag tag1, in Tag tag2)
 float goal_path_norma(in FeatureCell feature, in FeatureCell goal)
 {
   float path_norma = 0.f;
-  float distScale = length(goal.points[pathLength - 1] + feature.points[pathLength - 1]) * 0.5f;
-  for (uint i = 0; i < pathLength; i++)
+  float distScale = length(goal.points[PATH_LENGTH - 1] + feature.points[PATH_LENGTH - 1]) * 0.5f;
+  for (uint i = 0; i < PATH_LENGTH; i++)
     path_norma += length(goal.points[i] - feature.points[i]);
   return path_norma / (0.1f + distScale);
 }
@@ -85,7 +85,7 @@ float goal_path_norma(in FeatureCell feature, in FeatureCell goal)
 float trajectory_v_norma(in FeatureCell feature, in FeatureCell goal)
 {
   float path_norma = 0.f;
-  for (uint i = 0; i < pathLength; i++)
+  for (uint i = 0; i < PATH_LENGTH; i++)
     path_norma += length(goal.pointsVelocity[i] - feature.pointsVelocity[i]);
   return path_norma;
 }
@@ -93,7 +93,7 @@ float trajectory_v_norma(in FeatureCell feature, in FeatureCell goal)
 float trajectory_w_norma(in FeatureCell feature, in FeatureCell goal)
 {
   float path_norma = 0.f;
-  for (uint i = 0; i < pathLength; i++)
+  for (uint i = 0; i < PATH_LENGTH; i++)
     path_norma += abs(goal.angularVelocity[i] - feature.angularVelocity[i]);
   return path_norma;
 }
@@ -120,7 +120,8 @@ void main()
   {
     circle_limit = data_size - base_idx < iterations ? data_size - base_idx : iterations;
   }
-  while (queue_index < queue_size)
+  //while (queue_index < queue_size)
+  for (int i = gl_WorkGroupID.y; i < 2001; i +=16)
   {
     MatchingScores score;
     min_scores[gl_LocalInvocationID.x].full_score = INF;
@@ -137,18 +138,18 @@ void main()
         }
       }
     }
-    uint step = GROUP_SIZE / 2;
+    uint step = 1;
     uint arr_size = data_size / iterations;
     if (arr_size % iterations > 0)
       arr_size++;
     memoryBarrierShared();
     barrier();
    
-    while (step > 0) {
-      if ((gl_LocalInvocationID.x < step) && (gl_LocalInvocationID.x + step < arr_size)) 
+    while (step < GROUP_SIZE) {
+      if ((gl_LocalInvocationID.x + step < arr_size) && (gl_LocalInvocationID.x % (step * 2) == 0)) 
         if (min_scores[gl_LocalInvocationID.x + step].full_score < min_scores[gl_LocalInvocationID.x].full_score) 
           min_scores[gl_LocalInvocationID.x] = min_scores[gl_LocalInvocationID.x + step];
-      step /= 2;
+      step *= 2;
       memoryBarrierShared();
       barrier();
     }
@@ -156,5 +157,4 @@ void main()
       results[queue_index * gl_NumWorkGroups.x + gl_WorkGroupID.x] = min_scores[0];
     queue_index += gl_NumWorkGroups.y;
   }
-  barrier();
 }

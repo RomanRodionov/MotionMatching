@@ -30,6 +30,7 @@ namespace ecs
     render = ecs::get_system_stage("render");
     ui = ecs::get_system_stage("ui");
     menu = ecs::get_system_stage("ui_menu");
+    animation = ecs::get_system_stage("animation");
   }
 
   void SceneManager::swap_editor_game_scene()
@@ -88,8 +89,12 @@ namespace ecs
       update_range(menu);
       ImGui::EndMainMenuBar();
     }
-
   }
+void SceneManager::update_animation()
+  {
+    update_range(animation);
+  }
+
 
   void SceneManager::process_events()
   {

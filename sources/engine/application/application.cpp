@@ -130,6 +130,7 @@ void Application::main_loop()
 
     if (running)
     {
+      MICROPROFILE_SCOPEGPUI("frame", 0x0000ff);
       PROFILER(ecs_events);
       scene->process_events();
       ecs_events.stop();
@@ -144,24 +145,33 @@ void Application::main_loop()
       context.swap_buffer();
       swapchain.stop();
       ProfilerLabelGPU frame_label("frame");
-      MICROPROFILE_SCOPEGPUI("frame", 0x0000ff);
+      
       PROFILER(ecs_render);
       scene->update_render();
       ecs_render.stop();
       
       PROFILER(ui)
       context.start_imgui();
-      PROFILER(ecs_ui);
-      scene->update_ui();
-      ecs_ui.stop();
+      {
+        PROFILER(ecs_ui);
+        scene->update_ui();
+      }
       
       ProfilerLabelGPU imgui_render_label("imgui_render");
-      MICROPROFILE_SCOPEGPUI("imgui_render", 0x0000ff);
-      PROFILER(imgui_render);
-      ImGui::Render();
-      ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-      imgui_render.stop();
+      {
+        MICROPROFILE_SCOPEGPUI("imgui_render", 0x0000ff);
+        PROFILER(imgui_render);
+        ImGui::Render();
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        imgui_render.stop();
+      }
       ui.stop();
+
+      {
+        MICROPROFILE_SCOPEGPUI("animation_update", 0x0000ff);
+        PROFILER(ecs_animation);
+        scene->update_animation();
+      }
 
       MicroProfileFlip();
       static bool once = false;
