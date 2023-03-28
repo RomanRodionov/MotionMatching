@@ -9,6 +9,9 @@
 #include <profiler/profiler.h>
 #include "microprofile/microprofile.h"
 
+#include <thread>
+#include <chrono>
+
 AnimationIndex solve_motion_matching(
   AnimationDataBasePtr dataBase,
   const AnimationIndex &index,
@@ -161,13 +164,13 @@ public:
   void store_goal(void *data, uint item_size, uint item_count)
   {
     store_ssbo(goal_ssbo[index], data, item_size * item_count, GL_DYNAMIC_DRAW);
-    //debug_log("%d %d %d %d\n", index, goal_ssbo.size(), item_size, item_count);
+    debug_log("%d %d %d %d\n", index, goal_ssbo.size(), item_size, item_count);
     occupancy[index] = item_count;
   }
   void retrieve_result(void *data, uint item_size, uint &item_count)
   {
-    retrieve_ssbo(result_ssbo[index], data, item_size * occupancy[index]);
     item_count = occupancy[index];
+    retrieve_ssbo(result_ssbo[index], data, item_size * item_count);
     occupancy[index] = 0;
   }
   void bind_pair(uint idx, uint goal_binding, uint result_binding)
@@ -194,7 +197,8 @@ struct CSData : ecs::Singleton
 {
   uint feature_ssbo, group_size;
   BuffersParity buffers_parity;
-  glm::uvec2 dispatch_size;
+  int dispatch_size;
+  int max_parallel_char;
   uint invocations;
   vector<uint> clip_labels;
   int dataSize, resSize, iterations;
@@ -203,11 +207,10 @@ struct CSData : ecs::Singleton
   vector<vector<IdentifiedGoal>> goals;
 };
 
-SYSTEM(stage=act;before=motion_matching_cs_update, motion_matching_update) init_cs_data(
+SYSTEM(stage=act;after=motion_matching_cs_update, motion_matching_update) init_cs_data(
   Asset<AnimationDataBase> &dataBase,
   bool &mm_mngr,
   int &groups_per_char,
-  int &parallel_char,
   int &group_size,
   CSData &cs_data,
   SettingsContainer &settingsContainer,
@@ -215,29 +218,31 @@ SYSTEM(stage=act;before=motion_matching_cs_update, motion_matching_update) init_
 {
   if (!cs_data.initialized)
   {
-    cs_data.dispatch_size = {groups_per_char, parallel_char};
-    for (int i = 0; i < 2; ++i)
+    cs_data.dispatch_size = groups_per_char;
+    int max_dispatch;
+    glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 0, &max_dispatch);
+    if (max_dispatch < cs_data.dispatch_size)
     {
-      int max_dispatch;
-      glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, i, &max_dispatch);
-      if (max_dispatch < cs_data.dispatch_size[i])
-      {
-        cs_data.dispatch_size[i] = max_dispatch;
-      }
+      cs_data.dispatch_size = max_dispatch;
     }
-    cs_data.invocations = cs_data.dispatch_size.x * group_size;
+    glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 1, &cs_data.max_parallel_char);
+    if (cs_data.max_parallel_char > MAX_QUEUE_SIZE)
+    {
+      cs_data.max_parallel_char = MAX_QUEUE_SIZE;
+    }
+    cs_data.invocations = cs_data.dispatch_size * group_size;
     cs_data.group_size = group_size;
     const MotionMatchingSettings &mmsettings = settingsContainer.motionMatchingSettings[mmIndex ? *mmIndex : 0].second;
     cs_data.feature_ssbo = create_ssbo();
     store_database(dataBase, mmsettings, cs_data.clip_labels, cs_data.feature_ssbo, cs_data.dataSize);
     cs_data.iterations = cs_data.dataSize / cs_data.invocations;
     if (cs_data.dataSize % cs_data.invocations > 0) cs_data.iterations++;
-    cs_data.resSize = cs_data.dispatch_size.x;
+    cs_data.resSize = cs_data.dispatch_size;
     cs_data.scores = new ShaderMatchingScores[MAX_QUEUE_SIZE * cs_data.resSize];
     cs_data.buffers_parity.init_size(MAX_QUEUE_SIZE * sizeof(FeatureCell), MAX_QUEUE_SIZE * cs_data.resSize * sizeof(ShaderMatchingScores));
     cs_data.buffers_parity.create_pair();
     cs_data.initialized = true;
-    debug_log("cs data was initialized");
+    debug_log("cs data have been initialized");
   }
 }
 
@@ -274,7 +279,7 @@ SYSTEM(stage=act;) motion_matching_cs_update(
         cs_data.goals[step].clear();
       }
       cs_data.buffers_parity.bind_pair(step, 2, 1);
-      uint queue_size = goal_buffer.get_size() < MAX_QUEUE_SIZE ? goal_buffer.get_size() : MAX_QUEUE_SIZE;
+      uint queue_size = goal_buffer.get_size() < cs_data.max_parallel_char ? goal_buffer.get_size() : cs_data.max_parallel_char;
       compute_shader.set_int("queue_size", queue_size);
       featureData.clear();
       for (uint idx = 0; idx < queue_size; ++idx)
@@ -293,7 +298,7 @@ SYSTEM(stage=act;) motion_matching_cs_update(
       {
         ProfilerLabelGPU label("dispatch cs");
         MICROPROFILE_SCOPEGPUI("mm_shader", 0xff0f0f);
-        compute_shader.dispatch(cs_data.dispatch_size);
+        compute_shader.dispatch(cs_data.dispatch_size, queue_size);
         compute_shader.wait();
       }
       step++;
@@ -313,6 +318,7 @@ SYSTEM(stage=animation;) motion_matching_cs_retrieve(
   if (cs_data.goals.size() > 0)
   {
     MICROPROFILE_SCOPEI("MM_CS_RETRIEVE", "mm_cs_retrieve_function", 0xff1f1f);
+    //std::this_thread::sleep_for(std::chrono::nanoseconds(100000000));
     const MotionMatchingSettings &mmsettings = settingsContainer.motionMatchingSettings[mmIndex ? *mmIndex : 0].second;
     auto compute_shader = get_compute_shader("compute_motion");
     compute_shader.use();

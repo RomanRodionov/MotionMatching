@@ -3,8 +3,7 @@
 #compute_shader
 
 #define INF 1e16
-#define GROUP_SIZE 64
-
+#define GROUP_SIZE 16
 #define NODES_COUNT 4
 #define PATH_LENGTH 3
 
@@ -111,47 +110,42 @@ shared MatchingScores min_scores[GROUP_SIZE];
 
 void main()
 {
-  uint queue_index = gl_WorkGroupID.y;
   uint circle_limit;
   uint base_idx = gl_GlobalInvocationID.x * iterations;
   if (data_size > base_idx)
   {
     circle_limit = data_size - base_idx < iterations ? data_size - base_idx : iterations;
   }
-  while (queue_index < queue_size)
+  MatchingScores score;
+  min_scores[gl_LocalInvocationID.x].full_score = INF;
+  FeatureCell cur_goal = goal_data[gl_WorkGroupID.y];
+  for (uint i = 0; i < circle_limit; i++)
   {
-    MatchingScores score;
-    min_scores[gl_LocalInvocationID.x].full_score = INF;
-    FeatureCell cur_goal = goal_data[queue_index];
-    for (uint i = 0; i < circle_limit; i++)
+    if (has_goal_tags(cur_goal.tags, feature[base_idx + i].tags))
     {
-      if (has_goal_tags(cur_goal.tags, feature[base_idx + i].tags))
+      score = get_score(feature[base_idx + i], cur_goal);
+      if (min_scores[gl_LocalInvocationID.x].full_score > score.full_score)
       {
-        score = get_score(feature[base_idx + i], cur_goal);
-        if (min_scores[gl_LocalInvocationID.x].full_score > score.full_score)
-        {
-          score.idx = base_idx + i;
-          min_scores[gl_LocalInvocationID.x] = score;
-        }
+        score.idx = base_idx + i;
+        min_scores[gl_LocalInvocationID.x] = score;
       }
     }
-    uint step = 1;
-    uint arr_size = data_size / iterations;
-    if (arr_size % iterations > 0)
-      arr_size++;
+  }
+  uint step = 1;
+  uint arr_size = data_size / iterations;
+  if (arr_size % iterations > 0)
+    arr_size++;
+  memoryBarrierShared();
+  barrier();
+   
+  while (step < GROUP_SIZE) {
+    if ((gl_LocalInvocationID.x + step < arr_size) && (gl_LocalInvocationID.x % (step * 2) == 0)) 
+      if (min_scores[gl_LocalInvocationID.x + step].full_score < min_scores[gl_LocalInvocationID.x].full_score) 
+        min_scores[gl_LocalInvocationID.x] = min_scores[gl_LocalInvocationID.x + step];
+    step *= 2;
     memoryBarrierShared();
     barrier();
-   
-    while (step < GROUP_SIZE) {
-      if ((gl_LocalInvocationID.x + step < arr_size) && (gl_LocalInvocationID.x % (step * 2) == 0)) 
-        if (min_scores[gl_LocalInvocationID.x + step].full_score < min_scores[gl_LocalInvocationID.x].full_score) 
-          min_scores[gl_LocalInvocationID.x] = min_scores[gl_LocalInvocationID.x + step];
-      step *= 2;
-      memoryBarrierShared();
-      barrier();
-    }
-    if (gl_LocalInvocationID.x == 0)
-      results[queue_index * gl_NumWorkGroups.x + gl_WorkGroupID.x] = min_scores[0];
-    queue_index += gl_NumWorkGroups.y;
   }
+  if (gl_LocalInvocationID.x == 0)
+    results[gl_WorkGroupID.y * gl_NumWorkGroups.x + gl_WorkGroupID.x] = min_scores[0];
 }

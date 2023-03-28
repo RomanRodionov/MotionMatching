@@ -147,7 +147,7 @@ public:
 	ComputeShader(int shaderIdx):Shader(shaderIdx){}
 	ComputeShader(const std::string &shader_name, GLuint shader_program, bool compiled, bool update_list = false):
 	        Shader(shader_name, shader_program, compiled, update_list){}
-  void dispatch(glm::uvec2 work_groups) const;
+  void dispatch(int x, int y, int z = 1) const;
 	void wait() const;
 };
 

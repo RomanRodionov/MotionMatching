@@ -276,9 +276,9 @@ void store_ubo(uint ubo, void *data, uint size)
 
 static ComputeShader badComputeShader(-1);
 
-void ComputeShader::dispatch(glm::uvec2 work_groups) const
+void ComputeShader::dispatch(int x, int y, int z) const
 {
-  glDispatchCompute(work_groups.x, work_groups.y, 1);
+  glDispatchCompute(x, y, z);
 }
 
 void ComputeShader::wait() const

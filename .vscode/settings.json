@@ -99,7 +99,9 @@
     "stop_token": "cpp",
     "valarray": "cpp",
     "variant": "cpp",
-    "miniz.c": "cpp"
+    "miniz.c": "cpp",
+    "ranges": "cpp",
+    "span": "cpp"
   },
   "launchOption.options": {
     "BuildType": [
