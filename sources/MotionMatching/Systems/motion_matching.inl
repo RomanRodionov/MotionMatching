@@ -129,6 +129,7 @@ struct ResultsBuffer : ecs::Singleton
 class BuffersParity
 {
   vector<uint> goal_ssbo, result_ssbo, occupancy;
+  vector<GLsync> sync;
   uint goal_init_size, result_init_size, index;
 public:
   BuffersParity()
@@ -152,6 +153,14 @@ public:
     store_ssbo(r_ssbo, NULL, result_init_size, GL_DYNAMIC_DRAW);
     store_ssbo(g_ssbo, NULL, goal_init_size, GL_DYNAMIC_READ);
     occupancy.push_back(0);
+  }
+  bool ready(uint idx)
+  {
+    return occupancy[idx] == 0 || goal_ssbo.size() <= idx;
+  }
+  uint get_size()
+  {
+    return goal_ssbo.size();
   }
   uint get_goal()
   {
@@ -190,6 +199,23 @@ public:
       create_pair();
     }
     index = idx;
+  }
+  void set_sync()
+  {
+    GLsync s = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+    if (sync.size() <= index)
+    {
+      sync.push_back(s);
+    }
+    else
+    {
+      sync[index] = s;
+    }
+  }
+  bool wait_sync(uint idx, GLuint64 time_out)
+  {
+    uint res = glClientWaitSync(sync[idx], 0, time_out);
+    return res == GL_ALREADY_SIGNALED || res == GL_CONDITION_SATISFIED;
   }
 };
 
@@ -246,7 +272,7 @@ SYSTEM(stage=act;after=motion_matching_cs_update, motion_matching_update) init_c
   }
 }
 
-SYSTEM(stage=act;) motion_matching_cs_update(
+SYSTEM(stage=act;after=motion_matching_cs_retrieve) motion_matching_cs_update(
   Asset<AnimationDataBase> &dataBase,
   bool &mm_mngr,
   GoalsBuffer &goal_buffer,
@@ -271,42 +297,46 @@ SYSTEM(stage=act;) motion_matching_cs_update(
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, cs_data.feature_ssbo);
     while(goal_buffer.ready())
     {        
-      if (cs_data.goals.size() <= step)
+      if (cs_data.buffers_parity.ready(step))
       {
-        cs_data.goals.push_back({});
-      }
-      else{
-        cs_data.goals[step].clear();
-      }
-      cs_data.buffers_parity.bind_pair(step, 2, 1);
-      uint queue_size = goal_buffer.get_size() < cs_data.max_parallel_char ? goal_buffer.get_size() : cs_data.max_parallel_char;
-      compute_shader.set_int("queue_size", queue_size);
-      featureData.clear();
-      for (uint idx = 0; idx < queue_size; ++idx)
-      {
-        IdentifiedGoal goal = goal_buffer.get();
-        cs_data.goals[step].push_back(goal);
-        FeatureCell goal_feature;
-        pack_goal_feature(goal.goal, mmsettings, goal_feature);
-        featureData.push_back(goal_feature);
-      }
-      {
-        ProfilerLabelGPU label("store goals");
-        MICROPROFILE_SCOPEGPUI("store_goals", 0xff0f0f);
-        cs_data.buffers_parity.store_goal(featureData.data(), sizeof(FeatureCell), featureData.size());
-      }
-      {
-        ProfilerLabelGPU label("dispatch cs");
-        MICROPROFILE_SCOPEGPUI("mm_shader", 0xff0f0f);
-        compute_shader.dispatch(cs_data.dispatch_size, queue_size);
-        compute_shader.wait();
+        if (cs_data.goals.size() <= step)
+        {
+          cs_data.goals.push_back({});
+        }
+        else{
+          cs_data.goals[step].clear();
+        }
+        uint queue_size = goal_buffer.get_size() < cs_data.max_parallel_char ? goal_buffer.get_size() : cs_data.max_parallel_char;
+        cs_data.buffers_parity.bind_pair(step, 2, 1);
+        compute_shader.set_int("queue_size", queue_size);
+        featureData.clear();
+        for (uint idx = 0; idx < queue_size; ++idx)
+        {
+          IdentifiedGoal goal = goal_buffer.get();
+          cs_data.goals[step].push_back(goal);
+          FeatureCell goal_feature;
+          pack_goal_feature(goal.goal, mmsettings, goal_feature);
+          featureData.push_back(goal_feature);
+        }
+        {
+          ProfilerLabelGPU label("store goals");
+          MICROPROFILE_SCOPEGPUI("store_goals", 0xff0f0f);
+          cs_data.buffers_parity.store_goal(featureData.data(), sizeof(FeatureCell), featureData.size());
+        }
+        {
+          ProfilerLabelGPU label("dispatch cs");
+          MICROPROFILE_SCOPEGPUI("mm_shader", 0xff0f0f);
+          compute_shader.dispatch(cs_data.dispatch_size, queue_size);
+          cs_data.buffers_parity.set_sync();
+          //compute_shader.wait();
+        }
       }
       step++;
     }
   }
 }
 
-SYSTEM(stage=animation;) motion_matching_cs_retrieve(
+SYSTEM(stage=act;before=motion_matching_cs_update) motion_matching_cs_retrieve(
   Asset<AnimationDataBase> &dataBase,
   bool &mm_mngr,
   GoalsBuffer &goal_buffer,
@@ -325,7 +355,15 @@ SYSTEM(stage=animation;) motion_matching_cs_retrieve(
     uint step = 0;
     for (auto goals : cs_data.goals)
     {        
-      if (goals.size() > 0)
+      bool s = cs_data.buffers_parity.wait_sync(step, 0);
+      if (s)
+      {
+        debug_log("yes\n");
+      }
+      else{
+        debug_error("no\n");
+      }
+      if (goals.size() > 0 && s)
       {
         uint queue_size;
         cs_data.buffers_parity.set_index(step);

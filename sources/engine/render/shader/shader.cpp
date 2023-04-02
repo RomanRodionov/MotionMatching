@@ -279,11 +279,12 @@ static ComputeShader badComputeShader(-1);
 void ComputeShader::dispatch(int x, int y, int z) const
 {
   glDispatchCompute(x, y, z);
+  glMemoryBarrier(GL_ALL_BARRIER_BITS);
 }
 
 void ComputeShader::wait() const
 {
-  glMemoryBarrier(GL_ALL_BARRIER_BITS);
+  glFinish();
 }
 
 ComputeShader get_compute_shader(const std::string &shader_name, bool with_log)
