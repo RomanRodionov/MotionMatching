@@ -1,5 +1,3 @@
-
-
 mm_manager {
   dataBase:Asset<AnimationDataBase> { path:t = "resources/MotionMatching/AnimationDataBase/light_data_base.AnimationDataBase"; }
   recordedTest:i = -1;
@@ -37,11 +35,10 @@ animated_char {
   }
   bone_remaped:b=false;
   personController:PersonController { }
-  updateMMStatistic:b = false;
+  updateMMStatistic:b=false;
   mmOptimisationIndex:i=7;
   charId:i=0;
 }
-
 
 fps_char {
   _extends:t = "animated_char";
