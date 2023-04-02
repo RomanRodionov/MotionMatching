@@ -35,8 +35,8 @@ ecs::SystemDescription motion_matching_cs_update_descr("motion_matching_cs_updat
   {ecs::get_type_description<int>("mmIndex"), true}
 }, {
 }, {},
+{"animation_player_update"},
 {},
-{"motion_matching_cs_retrieve"},
 motion_matching_cs_update_func, "act", {}, false);
 
 void motion_matching_cs_update_func()
@@ -56,9 +56,9 @@ ecs::SystemDescription motion_matching_cs_retrieve_descr("motion_matching_cs_ret
   {ecs::get_type_description<int>("mmIndex"), true}
 }, {
 }, {},
-{"motion_matching_cs_update"},
 {},
-motion_matching_cs_retrieve_func, "act", {}, false);
+{},
+motion_matching_cs_retrieve_func, "animation", {}, false);
 
 void motion_matching_cs_retrieve_func()
 {

@@ -140,12 +140,18 @@ void main()
    
   while (step < GROUP_SIZE) {
     if ((gl_LocalInvocationID.x + step < arr_size) && (gl_LocalInvocationID.x % (step * 2) == 0)) 
+    {
       if (min_scores[gl_LocalInvocationID.x + step].full_score < min_scores[gl_LocalInvocationID.x].full_score) 
+      {
         min_scores[gl_LocalInvocationID.x] = min_scores[gl_LocalInvocationID.x + step];
+      }
+    }
     step *= 2;
     memoryBarrierShared();
     barrier();
   }
   if (gl_LocalInvocationID.x == 0)
+  {
     results[gl_WorkGroupID.y * gl_NumWorkGroups.x + gl_WorkGroupID.x] = min_scores[0];
+  }
 }

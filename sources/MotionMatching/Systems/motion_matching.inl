@@ -173,7 +173,7 @@ public:
   void store_goal(void *data, uint item_size, uint item_count)
   {
     store_ssbo(goal_ssbo[index], data, item_size * item_count, GL_DYNAMIC_DRAW);
-    debug_log("%d %d %d %d\n", index, goal_ssbo.size(), item_size, item_count);
+    //debug_log("%d %d %d %d\n", index, goal_ssbo.size(), item_size, item_count);
     occupancy[index] = item_count;
   }
   void retrieve_result(void *data, uint item_size, uint &item_count)
@@ -272,7 +272,7 @@ SYSTEM(stage=act;after=motion_matching_cs_update, motion_matching_update) init_c
   }
 }
 
-SYSTEM(stage=act;after=motion_matching_cs_retrieve) motion_matching_cs_update(
+SYSTEM(stage=act;before=animation_player_update) motion_matching_cs_update(
   Asset<AnimationDataBase> &dataBase,
   bool &mm_mngr,
   GoalsBuffer &goal_buffer,
@@ -327,16 +327,16 @@ SYSTEM(stage=act;after=motion_matching_cs_retrieve) motion_matching_cs_update(
           ProfilerLabelGPU label("dispatch cs");
           MICROPROFILE_SCOPEGPUI("mm_shader", 0xff0f0f);
           compute_shader.dispatch(cs_data.dispatch_size, queue_size);
-          cs_data.buffers_parity.set_sync();
-          //compute_shader.wait();
         }
+        cs_data.buffers_parity.set_sync();
+        //compute_shader.wait();
       }
       step++;
     }
   }
 }
 
-SYSTEM(stage=act;before=motion_matching_cs_update) motion_matching_cs_retrieve(
+SYSTEM(stage=animation;) motion_matching_cs_retrieve(
   Asset<AnimationDataBase> &dataBase,
   bool &mm_mngr,
   GoalsBuffer &goal_buffer,
@@ -355,15 +355,7 @@ SYSTEM(stage=act;before=motion_matching_cs_update) motion_matching_cs_retrieve(
     uint step = 0;
     for (auto goals : cs_data.goals)
     {        
-      bool s = cs_data.buffers_parity.wait_sync(step, 0);
-      if (s)
-      {
-        debug_log("yes\n");
-      }
-      else{
-        debug_error("no\n");
-      }
-      if (goals.size() > 0 && s)
+      if (goals.size() > 0 & cs_data.buffers_parity.wait_sync(step, 500000))
       {
         uint queue_size;
         cs_data.buffers_parity.set_index(step);
@@ -538,29 +530,48 @@ SYSTEM(stage=act;before=animation_player_update) motion_matching_update(
         {
         default: 
         case MotionMatchingSolverType::BruteForce :
-          best_index = solve_motion_matching(dataBase, currentIndex, goal, matching.bestScore, mmsettings);
+          {
+            ProfilerLabel label("ANIMATION_UPDATE");
+            MICROPROFILE_SCOPEI("ANIMATION_UPDATE", "BruteForce", 0x00ff00);
+            best_index = solve_motion_matching(dataBase, currentIndex, goal, matching.bestScore, mmsettings);
+          }
           break;
         case MotionMatchingSolverType::CSBruteForce :
-          //debug_log("%d", charId);
-          goal_buffer.push(goal, currentIndex.get_clip_index(), currentIndex.get_cadr_index(), matching.bestScore, charId);
-          if (result_buffer.ready(charId))
           {
-            best_index = result_buffer.get(charId, matching.bestScore);
+            ProfilerLabel label("ANIMATION_UPDATE");
+            MICROPROFILE_SCOPEI("ANIMATION_UPDATE", "CSBruteForce", 0x00ff00);
+            //debug_log("%d", charId);
+            goal_buffer.push(goal, currentIndex.get_clip_index(), currentIndex.get_cadr_index(), matching.bestScore, charId);
+            if (result_buffer.ready(charId))
+            {
+              best_index = result_buffer.get(charId, matching.bestScore);
+            }
+            else
+            {
+              best_index = AnimationIndex(dataBase, currentIndex.get_clip_index(), currentIndex.get_cadr_index());
+            }
           }
-          else
-          {
-            best_index = AnimationIndex(dataBase, currentIndex.get_clip_index(), currentIndex.get_cadr_index());
-          }
-          //best_index = solve_motion_matching_cs(dataBase, currentIndex, goal, matching.bestScore, mmsettings);
           break;
         case MotionMatchingSolverType::VPTree :
-          best_index = solve_motion_matching_vp_tree(dataBase, goal, OptimisationSettings.vpTreeErrorTolerance);
+          {
+            ProfilerLabel label("ANIMATION_UPDATE");
+            MICROPROFILE_SCOPEI("ANIMATION_UPDATE", "VPTree", 0x00ff00);
+            best_index = solve_motion_matching_vp_tree(dataBase, goal, OptimisationSettings.vpTreeErrorTolerance);
+          }
           break;
         case MotionMatchingSolverType::CoverTree :
-          best_index = solve_motion_matching_cover_tree(dataBase, goal, OptimisationSettings.vpTreeErrorTolerance);
+          {
+            ProfilerLabel label("ANIMATION_UPDATE");
+            MICROPROFILE_SCOPEI("ANIMATION_UPDATE", "CoverTree", 0x00ff00);
+            best_index = solve_motion_matching_cover_tree(dataBase, goal, OptimisationSettings.vpTreeErrorTolerance);
+          }
           break;
         case MotionMatchingSolverType::KDTree :
-          best_index = solve_motion_matching_kd_tree(dataBase, goal, OptimisationSettings.vpTreeErrorTolerance);
+          {
+            ProfilerLabel label("ANIMATION_UPDATE");
+            MICROPROFILE_SCOPEI("ANIMATION_UPDATE", "KDTree", 0x00ff00);
+            best_index = solve_motion_matching_kd_tree(dataBase, goal, OptimisationSettings.vpTreeErrorTolerance);
+          }
           break;
         }
         bool can_jump = true;

@@ -141,6 +141,12 @@ void Application::main_loop()
       scene->update_act();
       ecs_act.stop();
       
+      {
+        MICROPROFILE_SCOPEGPUI("animation_update", 0x0000ff);
+        PROFILER(ecs_animation);
+        scene->update_animation();
+      }
+      
       PROFILER(swapchain);
       context.swap_buffer();
       swapchain.stop();
@@ -166,12 +172,6 @@ void Application::main_loop()
         imgui_render.stop();
       }
       ui.stop();
-
-      {
-        MICROPROFILE_SCOPEGPUI("animation_update", 0x0000ff);
-        PROFILER(ecs_animation);
-        scene->update_animation();
-      }
 
       MicroProfileFlip();
       static bool once = false;
