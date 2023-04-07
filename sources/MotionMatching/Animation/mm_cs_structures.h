@@ -69,10 +69,17 @@ struct CSData : ecs::Singleton
   vector<vector<IdentifiedGoal>> goals;
 };
 
-AnimationIndex solve_motion_matching_cs(
-  AnimationDataBasePtr dataBase,
+void push_motion_matching_cs_task(
   const AnimationIndex &index,
   const AnimationGoal &goal,
+  MatchingScores &best_score,
+  int& charId,
+  GoalsBuffer& goal_buffer);
+
+  
+AnimationIndex get_motion_matching_cs_results(
+  AnimationDataBasePtr dataBase,
+  const AnimationIndex &index,
   MatchingScores &best_score,
   int& charId,
   GoalsBuffer& goal_buffer,

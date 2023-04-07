@@ -148,16 +148,24 @@ bool BuffersParity::wait_sync(uint idx, GLuint64 time_out)
   return res == GL_ALREADY_SIGNALED || res == GL_CONDITION_SATISFIED;
 }
 
-AnimationIndex solve_motion_matching_cs(
-  AnimationDataBasePtr dataBase,
+void push_motion_matching_cs_task(
   const AnimationIndex &index,
   const AnimationGoal &goal,
+  MatchingScores &best_score,
+  int& charId,
+  GoalsBuffer& goal_buffer)
+{
+  goal_buffer.push(goal, index.get_clip_index(), index.get_cadr_index(), best_score, charId);
+}
+
+AnimationIndex get_motion_matching_cs_results(
+  AnimationDataBasePtr dataBase,
+  const AnimationIndex &index,
   MatchingScores &best_score,
   int& charId,
   GoalsBuffer& goal_buffer,
   ResultsBuffer& result_buffer)
 {
-  goal_buffer.push(goal, index.get_clip_index(), index.get_cadr_index(), best_score, charId);
   if (result_buffer.ready(charId))
   {
     return result_buffer.get(charId, best_score);

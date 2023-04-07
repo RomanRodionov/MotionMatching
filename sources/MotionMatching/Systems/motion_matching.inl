@@ -150,7 +150,8 @@ SYSTEM(stage=act;before=animation_player_update) motion_matching_update(
       settings.TotalMMCount++;
       matching.lod = OptimisationSettings.lodOptimisation ? matching.lod : 0;
       float lodSkipTime = OptimisationSettings.lodSkipSeconds[matching.lod];
-      if (!OptimisationSettings.lodOptimisation || matching.skip_time >= lodSkipTime)
+      if (!OptimisationSettings.lodOptimisation || matching.skip_time >= lodSkipTime || 
+              (MotionMatchingSolverType)OptimisationSettings.solverType == MotionMatchingSolverType::CSBruteForce)
       {
         settings.afterLodOptimization++;
         matching.skip_time -= lodSkipTime;
@@ -184,7 +185,11 @@ SYSTEM(stage=act;before=animation_player_update) motion_matching_update(
           {
             ProfilerLabel label("ANIMATION_UPDATE");
             MICROPROFILE_SCOPEI("ANIMATION_UPDATE", "CSBruteForce", 0x00ff00);
-            best_index = solve_motion_matching_cs(dataBase, currentIndex, goal, matching.bestScore, charId, goal_buffer, result_buffer);
+            if (!OptimisationSettings.lodOptimisation || matching.skip_time >= lodSkipTime)
+            {
+              push_motion_matching_cs_task(currentIndex, goal, matching.bestScore, charId, goal_buffer);
+            }
+            best_index = get_motion_matching_cs_results(dataBase, currentIndex, matching.bestScore, charId, goal_buffer, result_buffer);
           }
           break;
         case MotionMatchingSolverType::VPTree :
