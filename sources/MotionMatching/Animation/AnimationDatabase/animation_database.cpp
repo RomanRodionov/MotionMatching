@@ -94,8 +94,8 @@ void AnimationDataBase::apply_settings(const MotionMatchingSettings &mmsettings,
       }
       for (uint point = 0; point < (uint)AnimationTrajectory::PathLength; point++)
       {
-        frame.trajectory.trajectory[point].velocity = frame.trajectory.trajectory[point].velocity;// * mmsettings.goalVelocityWeight;
-        frame.trajectory.trajectory[point].angularVelocity = frame.trajectory.trajectory[point].angularVelocity;// * mmsettings.goalAngularVelocityWeight;
+        frame.trajectory.trajectory[point].velocity = frame.trajectory.trajectory[point].velocity * mmsettings.goalVelocityWeight;
+        frame.trajectory.trajectory[point].angularVelocity = frame.trajectory.trajectory[point].angularVelocity * mmsettings.goalAngularVelocityWeight;
       }
     }
     modifiedClips.push_back(clip);
@@ -110,6 +110,7 @@ void AnimationDataBase::acceleration_structs(bool applySettingsOnce, bool check_
       return;
   }
   std::vector<AnimationClip>& actualClips = (applySettingsOnce && !modifiedClips.empty()) ? modifiedClips : clips;
+  debug_log((applySettingsOnce && !modifiedClips.empty()) ? "m" : "nm");
   vpTrees.clear();
   coverTrees.clear();
   kdTrees.clear();

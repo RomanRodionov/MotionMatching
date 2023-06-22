@@ -97,6 +97,30 @@ struct MMProfiler : ecs::Singleton
   }
 };
 
+AnimationGoal apply_settings_to_goal(const AnimationGoal& goal, const MotionMatchingSettings &mmsettings)
+{
+  AnimationGoal new_goal = goal;
+  if (mmsettings.applySettingsOnce)
+  {
+    float poseWeight = mmsettings.poseMatchingWeight;
+    float velocityWeight = mmsettings.velocityMatchingWeight;
+    for (uint node = 0; node < (uint)AnimationFeaturesNode::Count; node++)
+    {
+      new_goal.feature.features.nodes[node] = goal.feature.features.nodes[node] * float(mmsettings.nodeWeights[node]) * poseWeight;
+      if (mmsettings.velocityMatching)
+        new_goal.feature.features.nodesVelocity[node] = goal.feature.features.nodesVelocity[node] * float(mmsettings.velocitiesWeights[node]) * velocityWeight;
+      else
+        new_goal.feature.features.nodesVelocity[node] = vec3(0, 0, 0);
+    }
+    for (uint point = 0; point < (uint)AnimationTrajectory::PathLength; point++)
+    {
+      new_goal.feature.trajectory.trajectory[point].velocity = goal.feature.trajectory.trajectory[point].velocity * mmsettings.goalVelocityWeight;
+      new_goal.feature.trajectory.trajectory[point].angularVelocity = goal.feature.trajectory.trajectory[point].angularVelocity * mmsettings.goalAngularVelocityWeight;
+    }
+  }
+  return new_goal;
+}
+
 SYSTEM(stage=act;before=animation_player_update) motion_matching_update(
   Transform &transform,
   AnimationPlayer &animationPlayer,
@@ -134,18 +158,17 @@ SYSTEM(stage=act;before=animation_player_update) motion_matching_update(
     
     material->set_property("material.AdditionalColor", lodColor);
 
-
     auto &index = matching.index;
     AnimationIndex saveIndex = index.current_index();
     index.update(dt, settings.lerpTime);
     matching.skip_time += dt;
-    
 
     AnimationIndex currentIndex = index.current_index();
     if (saveIndex != currentIndex)
     {
       ProfileTrack track;
       auto &goal = animationPlayer.inputGoal;
+      auto new_goal = apply_settings_to_goal(goal, mmsettings);
       auto dataBase = matching.dataBase;
       settings.TotalMMCount++;
       matching.lod = OptimisationSettings.lodOptimisation ? matching.lod : 0;
@@ -178,7 +201,7 @@ SYSTEM(stage=act;before=animation_player_update) motion_matching_update(
           {
             ProfilerLabel label("ANIMATION_UPDATE");
             MICROPROFILE_SCOPEI("ANIMATION_UPDATE", "BruteForce", 0x00ff00);
-            best_index = solve_motion_matching(dataBase, currentIndex, goal, matching.bestScore, mmsettings);
+            best_index = solve_motion_matching(dataBase, currentIndex, new_goal, matching.bestScore, mmsettings);
           }
           break;
         case MotionMatchingSolverType::CSBruteForce :
@@ -196,21 +219,21 @@ SYSTEM(stage=act;before=animation_player_update) motion_matching_update(
           {
             ProfilerLabel label("ANIMATION_UPDATE");
             MICROPROFILE_SCOPEI("ANIMATION_UPDATE", "VPTree", 0x00ff00);
-            best_index = solve_motion_matching_vp_tree(dataBase, goal, OptimisationSettings.vpTreeErrorTolerance);
+            best_index = solve_motion_matching_vp_tree(dataBase, new_goal, OptimisationSettings.vpTreeErrorTolerance);
           }
           break;
         case MotionMatchingSolverType::CoverTree :
           {
             ProfilerLabel label("ANIMATION_UPDATE");
             MICROPROFILE_SCOPEI("ANIMATION_UPDATE", "CoverTree", 0x00ff00);
-            best_index = solve_motion_matching_cover_tree(dataBase, goal, OptimisationSettings.vpTreeErrorTolerance);
+            best_index = solve_motion_matching_cover_tree(dataBase, new_goal, OptimisationSettings.vpTreeErrorTolerance);
           }
           break;
         case MotionMatchingSolverType::KDTree :
           {
             ProfilerLabel label("ANIMATION_UPDATE");
             MICROPROFILE_SCOPEI("ANIMATION_UPDATE", "KDTree", 0x00ff00);
-            best_index = solve_motion_matching_kd_tree(dataBase, goal, OptimisationSettings.vpTreeErrorTolerance);
+            best_index = solve_motion_matching_kd_tree(dataBase, new_goal, OptimisationSettings.vpTreeErrorTolerance);
           }
           break;
         }

@@ -86,8 +86,8 @@ MatchingScores get_score(const FrameFeature& clip_feature, const FrameFeature& g
   score.goal_path = goal_path_norma(clip_feature.trajectory, goal_feature.trajectory) * settings.goalPathMatchingWeight;
   if (settings.applySettingsOnce)
   {
-    score.trajectory_v = trajectory_v_norma(clip_feature.trajectory, goal_feature.trajectory) * settings.goalVelocityWeight;
-    score.trajectory_w = trajectory_w_norma(clip_feature.trajectory, goal_feature.trajectory) * settings.goalAngularVelocityWeight;
+    score.trajectory_v = trajectory_v_norma(clip_feature.trajectory, goal_feature.trajectory);
+    score.trajectory_w = trajectory_w_norma(clip_feature.trajectory, goal_feature.trajectory);
   }
   else
   {
@@ -104,11 +104,11 @@ float path_norma(const AnimationTrajectory& clip_feature, const AnimationTraject
   if (settings.applySettingsOnce)
   {
       return 
-      goal_path_norma(clip_feature, goal_feature) * settings.goalPathMatchingWeight
+      goal_path_norma(clip_feature, goal_feature)
         +
-      trajectory_v_norma(clip_feature, goal_feature) * settings.goalVelocityWeight
+      trajectory_v_norma(clip_feature, goal_feature)
         +
-      trajectory_w_norma(clip_feature, goal_feature) * settings.goalAngularVelocityWeight;
+      trajectory_w_norma(clip_feature, goal_feature);
   }
   return 
   goal_path_norma(clip_feature, goal_feature) * settings.goalPathMatchingWeight
@@ -122,13 +122,13 @@ float FrameMetric::distance(const FrameFeature& clip_feature, const FrameFeature
 {
   if (settings.applySettingsOnce)
   {
-      pose_matching_norma(clip_feature.features, goal_feature.features, settings) * settings.realism
+      pose_matching_norma(clip_feature.features, goal_feature.features, settings)
         +
-      goal_path_norma(clip_feature.trajectory, goal_feature.trajectory) * settings.goalPathMatchingWeight
+      goal_path_norma(clip_feature.trajectory, goal_feature.trajectory)
         +
-      trajectory_v_norma(clip_feature.trajectory, goal_feature.trajectory) * settings.goalVelocityWeight
+      trajectory_v_norma(clip_feature.trajectory, goal_feature.trajectory)
         +
-      trajectory_w_norma(clip_feature.trajectory, goal_feature.trajectory) * settings.goalAngularVelocityWeight;
+      trajectory_w_norma(clip_feature.trajectory, goal_feature.trajectory);
   }
   return 
   pose_matching_norma(clip_feature.features, goal_feature.features, settings) * settings.realism
