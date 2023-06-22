@@ -40,7 +40,9 @@ void init_animation_character_singl_handler(const ecs::Event &event, ecs::Entity
 
 ecs::EventDescription init_animation_character_descr(
   ecs::get_mutable_event_handlers<ecs::OnEntityCreated>(), "init_animation_character", {
-  {ecs::get_type_description<AnimationPlayer>("animationPlayer"), false}
+  {ecs::get_type_description<AnimationPlayer>("animationPlayer"), false},
+  {ecs::get_type_description<int>("mmIndex"), true},
+  {ecs::get_type_description<SettingsContainer>("settingsContainer"), false}
 }, {
 }, {"game","editor"},
 {},

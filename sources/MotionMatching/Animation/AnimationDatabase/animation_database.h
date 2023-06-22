@@ -18,9 +18,12 @@ public:
     (Asset<FBXMeta>) (treeSource),
     (vector<string>) (tagsNames)
   )
-  void acceleration_structs(bool check_existance = false);
+  void apply_settings(const MotionMatchingSettings &mmsettings, bool check_state = false);
+  void acceleration_structs(bool applySettingsOnce = false, bool check_existance = false);
   bool needForceReload;
   std::vector<std::vector<float>> matchingScore;
+
+  vector<AnimationClip> modifiedClips;
 
   std::vector<VPTree> vpTrees;
   std::vector<CoverTree> coverTrees;

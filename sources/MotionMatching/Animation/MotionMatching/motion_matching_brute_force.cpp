@@ -29,9 +29,18 @@ AnimationIndex solve_motion_matching(
   //#pragma omp declare reduction(mm_min: ArgMin: omp_out=mm_min2(omp_out, omp_in))\
   //  initializer(omp_priv={INFINITY, 0, 0,{0,0,0,0,0,0}})
   //#pragma omp parallel for reduction(mm_min:best)
-  for (uint nextClip = 0; nextClip < dataBase->clips.size(); nextClip++)
+  std::vector<AnimationClip>& actualClips = (mmsettings.applySettingsOnce && !dataBase->modifiedClips.empty()) ? dataBase->modifiedClips : dataBase->clips;
+  if (mmsettings.applySettingsOnce && !dataBase->modifiedClips.empty())
   {
-    const AnimationClip &clip = dataBase->clips[nextClip];
+    //debug_error("mod\n");
+  }
+  else
+  {
+    //debug_error("orig\n");
+  }
+  for (uint nextClip = 0; nextClip < actualClips.size(); nextClip++)
+  {
+    const AnimationClip &clip = actualClips[nextClip];
 
     if (!has_goal_tags(goal.tags, clip.tags))
       continue;

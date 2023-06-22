@@ -132,7 +132,7 @@
     ]
   },
   "launchOption.currentConfig": {
-    "BuildType": "rel",
+    "BuildType": "dev",
     "Project": {
       "name": "MotionMatching",
       "delpoy_only_project_folder": "false"

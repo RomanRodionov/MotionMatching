@@ -153,7 +153,7 @@ std::pair<uint, uint> VPTree::find_closest(const T &point, float tolerance_error
 
     return {out->clip, out->frame};
   }
-  debug_log("-");
+  //debug_log("-");
   
   float minRes = norma(*points[0].p, point);
   uint bestInd = 0;

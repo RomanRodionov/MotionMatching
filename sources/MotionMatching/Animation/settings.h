@@ -64,7 +64,8 @@ struct MotionMatchingSettings
     NODE(LeftHand),
     NODE(RightHand),
     NODE(LeftToeBase),
-    NODE(RightToeBase)
+    NODE(RightToeBase),
+    (bool)  (applySettingsOnce)
   )
   #undef NODE
   std::reference_wrapper<float> nodeWeights[(int)AnimationFeaturesNode::Count] = {LeftHand, RightHand, LeftToeBase, RightToeBase};

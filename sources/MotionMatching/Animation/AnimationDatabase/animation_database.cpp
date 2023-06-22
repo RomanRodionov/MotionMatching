@@ -65,14 +65,51 @@ bool AnimationDataBase::edit()
   return changeTree | needForceReload;
 }; 
 
-void AnimationDataBase::acceleration_structs(bool check_existance)
+void AnimationDataBase::apply_settings(const MotionMatchingSettings &mmsettings, bool check_state)
+{
+  if (check_state)
+  {
+    if (!modifiedClips.empty())
+      return;
+  }
+  if (!mmsettings.applySettingsOnce)
+  {
+    return;
+  }
+  float poseWeight = mmsettings.poseMatchingWeight;
+  float velocityWeight = mmsettings.velocityMatchingWeight;
+  for (uint nextClip = 0; nextClip < clips.size(); nextClip++)
+  {
+    AnimationClip clip = clips[nextClip];
+    for (uint nextCadr = 0, n = clip.duration; nextCadr < n; nextCadr++)
+    {
+      auto &frame = clip.features[nextCadr];
+      for (uint node = 0; node < (uint)AnimationFeaturesNode::Count; node++)
+      {
+        frame.features.nodes[node] = frame.features.nodes[node] * float(mmsettings.nodeWeights[node]) * poseWeight;
+        if (mmsettings.velocityMatching)
+          frame.features.nodesVelocity[node] = frame.features.nodesVelocity[node] * float(mmsettings.velocitiesWeights[node]) * velocityWeight;
+        else
+          frame.features.nodesVelocity[node] = vec3(0, 0, 0);
+      }
+      for (uint point = 0; point < (uint)AnimationTrajectory::PathLength; point++)
+      {
+        frame.trajectory.trajectory[point].velocity = frame.trajectory.trajectory[point].velocity;// * mmsettings.goalVelocityWeight;
+        frame.trajectory.trajectory[point].angularVelocity = frame.trajectory.trajectory[point].angularVelocity;// * mmsettings.goalAngularVelocityWeight;
+      }
+    }
+    modifiedClips.push_back(clip);
+  }
+}
+
+void AnimationDataBase::acceleration_structs(bool applySettingsOnce, bool check_existance)
 {
   if (check_existance)
   {
     if (!vpTrees.empty() && !coverTrees.empty() && !kdTrees.empty())
       return;
   }
-  
+  std::vector<AnimationClip>& actualClips = (applySettingsOnce && !modifiedClips.empty()) ? modifiedClips : clips;
   vpTrees.clear();
   coverTrees.clear();
   kdTrees.clear();
@@ -81,7 +118,7 @@ void AnimationDataBase::acceleration_structs(bool check_existance)
   TimeScope scope("Creating acceleration structs");
   map<Tag, size_t> tagMap;
   vector<AnimationTags> treeTags;
-  for (const AnimationClip &clip : clips)
+  for (const AnimationClip &clip : actualClips)
   {
     auto it = tagMap.find(clip.tags.tags);
     if (it == tagMap.end())
@@ -94,14 +131,14 @@ void AnimationDataBase::acceleration_structs(bool check_existance)
   vector<vector<CoverTree::Node>> nodes2(tagMap.size());
   vector<vector<KdTree::Node>> nodes3(tagMap.size());
 
-  for (uint i = 0; i < clips.size(); i++)
+  for (uint i = 0; i < actualClips.size(); i++)
   {
-    size_t j = tagMap[clips[i].tags.tags];
-    for (uint k = 0; k < clips[i].features.size(); k++)
+    size_t j = tagMap[actualClips[i].tags.tags];
+    for (uint k = 0; k < actualClips[i].features.size(); k++)
     {
-      nodes[j].emplace_back(VPTree::Node{&clips[i].features[k], i, k, 0.f, 0.f});
-      nodes2[j].emplace_back(CoverTree::Node{{}, &clips[i].features[k], i, k, 0.f, 0.f});
-      nodes3[j].emplace_back(KdTree::Node{&clips[i].features[k], i, k});
+      nodes[j].emplace_back(VPTree::Node{&actualClips[i].features[k], i, k, 0.f, 0.f});
+      nodes2[j].emplace_back(CoverTree::Node{{}, &actualClips[i].features[k], i, k, 0.f, 0.f});
+      nodes3[j].emplace_back(KdTree::Node{&actualClips[i].features[k], i, k});
     }
   }
   vpTrees.reserve(nodes.size());

@@ -27,12 +27,16 @@ SYSTEM(stage=act) animation_player_update(
 
 EVENT(scene=game, editor) init_animation_character(
   const ecs::OnEntityCreated &,
-  AnimationPlayer &animationPlayer)
+  AnimationPlayer &animationPlayer,
+  int *mmIndex,
+  SettingsContainer &settingsContainer)
 {
   if (animationPlayer.dataBase)
   {
     animationPlayer.dataBase.load();
-    animationPlayer.dataBase->acceleration_structs(true);
+    const MotionMatchingSettings &mmsettings = settingsContainer.motionMatchingSettings[mmIndex ? *mmIndex : 0].second;
+    animationPlayer.dataBase->apply_settings(mmsettings, true);
+    animationPlayer.dataBase->acceleration_structs(mmsettings.applySettingsOnce, true);
     animationPlayer.index = AnimationLerpedIndex(animationPlayer.dataBase, animationPlayer.clip, animationPlayer.frame);
     if (animationPlayer.index)
       animationPlayer.currentCadr = AnimationCadr(animationPlayer.index.get_lerped_cadr());
