@@ -36,6 +36,9 @@ struct FrameFeature
 public:
   NodeFeatures features;
   AnimationTrajectory trajectory;
+  static const int frameSize = (int)AnimationFeaturesNode::Count * 2 * 3 + (int)AnimationTrajectory::PathLength * (2 * 3 + 1);
+  static void get_sizes(std::vector<int>& featuresSizes);
+  void save_to_array(std::array<float, frameSize>& featuresArray);
 };
 
 struct AnimationGoal

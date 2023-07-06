@@ -29,6 +29,10 @@ public:
   std::vector<CoverTree> coverTrees;
   std::vector<KdTree> kdTrees;
 
+  std::vector<std::array<float, FrameFeature::frameSize>> normalizedFeatures;
+  std::array<float, FrameFeature::frameSize> featuresScale;
+  std::array<float, FrameFeature::frameSize> featuresMean;
+
   int cadr_count() const;
   virtual void load(const filesystem::path &path, bool reload, AssetStatus &status) override;
   virtual bool edit() override; 

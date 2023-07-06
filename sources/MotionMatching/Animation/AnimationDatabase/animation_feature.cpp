@@ -139,3 +139,46 @@ float FrameMetric::distance(const FrameFeature& clip_feature, const FrameFeature
     +
   trajectory_w_norma(clip_feature.trajectory, goal_feature.trajectory) * settings.goalAngularVelocityWeight;
 }
+
+void FrameFeature::get_sizes(std::vector<int>& featuresSizes)
+{
+  for (int i = 0; i < (int)AnimationFeaturesNode::Count * 2; ++i)
+  {
+    featuresSizes.push_back(3);
+  }
+  
+  for (int i = 0; i < (int)AnimationTrajectory::PathLength; ++i)
+  {
+    featuresSizes.push_back(3);
+    featuresSizes.push_back(3);
+    featuresSizes.push_back(1);
+  }
+}
+
+void FrameFeature::save_to_array(std::array<float, FrameFeature::frameSize>& featuresArray)
+{
+  int offset = 0;
+  for (int i = 0; i < (int)AnimationFeaturesNode::Count; ++i)
+  {
+    for (int j = 0; j < 3; ++j)
+    {
+      featuresArray[offset++] = features.nodes[i][j];
+    }
+    for (int j = 0; j < 3; ++j)
+    {
+      featuresArray[offset++] = features.nodesVelocity[i][j];
+    }
+  }
+  for (int i = 0; i < (int)AnimationTrajectory::PathLength; ++i)
+  {
+    for (int j = 0; j < 3; ++j)
+    {
+      featuresArray[offset++] = trajectory.trajectory[i].point[j];
+    }
+    for (int j = 0; j < 3; ++j)
+    {
+      featuresArray[offset++] = trajectory.trajectory[i].velocity[j];
+    }
+    featuresArray[offset++] = trajectory.trajectory[i].angularVelocity;
+  }
+}
