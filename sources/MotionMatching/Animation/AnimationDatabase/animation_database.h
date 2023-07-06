@@ -19,7 +19,7 @@ public:
     (Asset<FBXMeta>) (treeSource),
     (vector<string>) (tagsNames)
   )
-  void normalize_database(const MotionMatchingSettings &mmsettings, bool check_state = false);
+  void normalize_database(const MotionMatchingSettings &mmsettings);
   void apply_settings(const MotionMatchingSettings &mmsettings, bool check_state = false);
   void acceleration_structs(bool applySettingsOnce = false, bool check_existance = false);
   bool needForceReload;
@@ -32,8 +32,7 @@ public:
   std::vector<KdTree> kdTrees;
 
   std::vector<std::array<float, FrameFeature::frameSize>> normalizedFeatures;
-  std::array<float, FrameFeature::frameSize> featuresScale;
-  std::array<float, FrameFeature::frameSize> featuresMean;
+  boundingStructure bounding;
 
   int cadr_count() const;
   virtual void load(const filesystem::path &path, bool reload, AssetStatus &status) override;

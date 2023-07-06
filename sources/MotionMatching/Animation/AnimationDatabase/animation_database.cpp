@@ -102,11 +102,57 @@ void AnimationDataBase::apply_settings(const MotionMatchingSettings &mmsettings,
   }
 }
 
+void AnimationDataBase::normalize_database(const MotionMatchingSettings &mmsettings)
+{
+  int frameIdx = 0;
+  for (uint nextClip = 0; nextClip < clips.size(); nextClip++)
+  {
+    bounding.clipsStarts.push_back(frameIdx);
+    AnimationClip& clip = clips[nextClip];
+    for (uint nextCadr = 0, n = clip.duration; nextCadr < n; nextCadr++)
+    {
+      normalizedFeatures.emplace_back();
+      clip.features[nextCadr].save_to_array(normalizedFeatures[frameIdx]);
+      frameIdx++;
+    }
+  }
+  const int vec_size = 3;
+  std::vector<int> featuresSizes;
+  FrameFeature::get_sizes(featuresSizes);
+  int idx = 0, offset;
+  offset = (vec_size * 2) * (int)AnimationFeaturesNode::LeftHand;
+  normalize_feature(normalizedFeatures, bounding.featuresScale, bounding.featuresMean, offset, vec_size, mmsettings.LeftHand);
+  offset += vec_size;
+  normalize_feature(normalizedFeatures, bounding.featuresScale, bounding.featuresMean, offset, vec_size, mmsettings.LeftHandSpeed);
+  offset = (vec_size * 2) * (int)AnimationFeaturesNode::RightHand;
+  normalize_feature(normalizedFeatures, bounding.featuresScale, bounding.featuresMean, offset, vec_size, mmsettings.RightHand);
+  offset += vec_size;
+  normalize_feature(normalizedFeatures, bounding.featuresScale, bounding.featuresMean, offset, vec_size, mmsettings.RightHandSpeed);
+  offset = (vec_size * 2) * (int)AnimationFeaturesNode::LeftToeBase;
+  normalize_feature(normalizedFeatures, bounding.featuresScale, bounding.featuresMean, offset, vec_size, mmsettings.LeftToeBase);
+  offset += vec_size;
+  normalize_feature(normalizedFeatures, bounding.featuresScale, bounding.featuresMean, offset, vec_size, mmsettings.LeftToeBaseSpeed);
+  offset = (vec_size * 2) * (int)AnimationFeaturesNode::RightToeBase;
+  normalize_feature(normalizedFeatures, bounding.featuresScale, bounding.featuresMean, offset, vec_size, mmsettings.RightToeBase);
+  offset += vec_size;
+  normalize_feature(normalizedFeatures, bounding.featuresScale, bounding.featuresMean, offset, vec_size, mmsettings.RightToeBaseSpeed);
+  offset = (int)AnimationFeaturesNode::Count * 2 * 3;
+  for (int i = 0; i < AnimationTrajectory::PathLength; ++i)
+  {
+    normalize_feature(normalizedFeatures, bounding.featuresScale, bounding.featuresMean, offset, vec_size, mmsettings.goalPathMatchingWeight);
+    offset += vec_size;
+    normalize_feature(normalizedFeatures, bounding.featuresScale, bounding.featuresMean, offset, vec_size, mmsettings.goalVelocityWeight);
+    offset += vec_size;
+    normalize_feature(normalizedFeatures, bounding.featuresScale, bounding.featuresMean, offset, 1, mmsettings.goalAngularVelocityWeight);
+    offset += 1;
+  }
+}
+
 void AnimationDataBase::acceleration_structs(bool applySettingsOnce, bool check_existance)
 {
   if (check_existance)
   {
-    if (!vpTrees.empty() && !coverTrees.empty() && !kdTrees.empty())
+    if (!vpTrees.empty() && !coverTrees.empty() && !kdTrees.empty() && !normalizedFeatures.empty())
       return;
   }
   std::vector<AnimationClip>& actualClips = (applySettingsOnce && !modifiedClips.empty()) ? modifiedClips : clips;
@@ -154,55 +200,9 @@ void AnimationDataBase::acceleration_structs(bool applySettingsOnce, bool check_
     coverTrees.emplace_back( treeTags[i], std::move(nodes2[i]), f);
     kdTrees.emplace_back(settings, treeTags[i], std::move(nodes3[i]), f);
   }
-}
 
-void AnimationDataBase::normalize_database(const MotionMatchingSettings &mmsettings, bool check_state)
-{
-  if (check_state)
-  {
-    return;
-  }
-  int frameIdx = 0;
-  for (uint nextClip = 0; nextClip < clips.size(); nextClip++)
-  {
-    AnimationClip& clip = clips[nextClip];
-    for (uint nextCadr = 0, n = clip.duration; nextCadr < n; nextCadr++)
-    {
-      clip.features[nextCadr].save_to_array(normalizedFeatures[frameIdx]);
-      frameIdx++;
-    }
-  }
-  const int vec_size = 3;
-  check_state = true;
-  std::vector<int> featuresSizes;
-  FrameFeature::get_sizes(featuresSizes);
-  int idx = 0, offset;
-  offset = (vec_size * 2) * (int)AnimationFeaturesNode::LeftHand;
-  normalize_feature(normalizedFeatures, featuresScale, featuresMean, offset, vec_size, mmsettings.LeftHand);
-  offset += vec_size;
-  normalize_feature(normalizedFeatures, featuresScale, featuresMean, offset, vec_size, mmsettings.LeftHandSpeed);
-  offset = (vec_size * 2) * (int)AnimationFeaturesNode::RightHand;
-  normalize_feature(normalizedFeatures, featuresScale, featuresMean, offset, vec_size, mmsettings.RightHand);
-  offset += vec_size;
-  normalize_feature(normalizedFeatures, featuresScale, featuresMean, offset, vec_size, mmsettings.RightHandSpeed);
-  offset = (vec_size * 2) * (int)AnimationFeaturesNode::LeftToeBase;
-  normalize_feature(normalizedFeatures, featuresScale, featuresMean, offset, vec_size, mmsettings.LeftToeBase);
-  offset += vec_size;
-  normalize_feature(normalizedFeatures, featuresScale, featuresMean, offset, vec_size, mmsettings.LeftToeBaseSpeed);
-  offset = (vec_size * 2) * (int)AnimationFeaturesNode::RightToeBase;
-  normalize_feature(normalizedFeatures, featuresScale, featuresMean, offset, vec_size, mmsettings.RightToeBase);
-  offset += vec_size;
-  normalize_feature(normalizedFeatures, featuresScale, featuresMean, offset, vec_size, mmsettings.RightToeBaseSpeed);
-  offset = (int)AnimationFeaturesNode::Count * 2 * 3;
-  for (int i = 0; i < AnimationTrajectory::PathLength; ++i)
-  {
-    normalize_feature(normalizedFeatures, featuresScale, featuresMean, offset, vec_size, mmsettings.goalPathMatchingWeight);
-    offset += vec_size;
-    normalize_feature(normalizedFeatures, featuresScale, featuresMean, offset, vec_size, mmsettings.goalVelocityWeight);
-    offset += vec_size;
-    normalize_feature(normalizedFeatures, featuresScale, featuresMean, offset, 1, mmsettings.goalAngularVelocityWeight);
-    offset += 1;
-  }
+  normalize_database(settings);
+  bounding.find_boxes_values(normalizedFeatures);
 }
 
 ResourceRegister<AnimationDataBase> animDataBaseReg;
