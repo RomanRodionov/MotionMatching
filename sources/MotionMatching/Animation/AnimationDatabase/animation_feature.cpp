@@ -155,7 +155,7 @@ void FrameFeature::get_sizes(std::vector<int>& featuresSizes)
   }
 }
 
-void FrameFeature::save_to_array(std::array<float, FrameFeature::frameSize>& featuresArray)
+void FrameFeature::save_to_array(std::array<float, FrameFeature::frameSize>& featuresArray) const
 {
   int offset = 0;
   for (int i = 0; i < (int)AnimationFeaturesNode::Count; ++i)

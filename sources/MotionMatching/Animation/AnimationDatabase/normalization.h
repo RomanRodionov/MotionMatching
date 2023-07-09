@@ -13,16 +13,11 @@ void normalize_feature(
     const int size, 
     const float weight = 1.0f);
 
-void normalize_frame(
-  std::array<float, FrameFeature::frameSize>& query, 
-  std::array<float, FrameFeature::frameSize>& n_query
-  );
-
 struct boundingStructure
 {
   std::array<float, FrameFeature::frameSize> featuresScale;
   std::array<float, FrameFeature::frameSize> featuresMean;
-  std::vector<int> clipsStarts;
+
   std::vector<std::array<float, FrameFeature::frameSize>> smBoxMin, smBoxMax, lrBoxMin, lrBoxMax;
   static const int LR_BOX_SIZE = 64, SM_BOX_SIZE = 16;
   void find_boxes_values(std::vector<std::array<float, FrameFeature::frameSize>> features);

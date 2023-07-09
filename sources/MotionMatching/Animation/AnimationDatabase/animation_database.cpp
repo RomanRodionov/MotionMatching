@@ -107,7 +107,7 @@ void AnimationDataBase::normalize_database(const MotionMatchingSettings &mmsetti
   int frameIdx = 0;
   for (uint nextClip = 0; nextClip < clips.size(); nextClip++)
   {
-    bounding.clipsStarts.push_back(frameIdx);
+    clipsStarts.push_back(frameIdx);
     AnimationClip& clip = clips[nextClip];
     for (uint nextCadr = 0, n = clip.duration; nextCadr < n; nextCadr++)
     {
@@ -116,6 +116,7 @@ void AnimationDataBase::normalize_database(const MotionMatchingSettings &mmsetti
       frameIdx++;
     }
   }
+  clipsStarts.push_back(frameIdx);
   const int vec_size = 3;
   std::vector<int> featuresSizes;
   FrameFeature::get_sizes(featuresSizes);

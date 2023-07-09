@@ -1,6 +1,6 @@
 #include "normalization.h"
 
-float sqrf(float f)
+static float sqrf(float f)
 {
   return f * f;
 }
@@ -59,17 +59,6 @@ void normalize_feature(
     {
       features[i][offset + j] = (features[i][offset + j] - featuresMean[offset + j]) / featuresScale[offset + j];
     }
-  }
-}
-
-void normalize_frame(
-  std::array<float, FrameFeature::frameSize>& query, 
-  std::array<float, FrameFeature::frameSize>& n_query,
-  boundingStructure& bounding)
-{
-  for (int i = 0; i < FrameFeature::frameSize; ++i)
-  {
-    n_query[i] = (query[i] - bounding.featuresMean[i]) / bounding.featuresScale[i];
   }
 }
 

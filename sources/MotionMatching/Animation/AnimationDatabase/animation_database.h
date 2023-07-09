@@ -33,6 +33,7 @@ public:
 
   std::vector<std::array<float, FrameFeature::frameSize>> normalizedFeatures;
   boundingStructure bounding;
+  std::vector<int> clipsStarts;
 
   int cadr_count() const;
   virtual void load(const filesystem::path &path, bool reload, AssetStatus &status) override;
