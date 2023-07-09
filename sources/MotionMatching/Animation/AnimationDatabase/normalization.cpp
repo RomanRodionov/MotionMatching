@@ -62,6 +62,17 @@ void normalize_feature(
   }
 }
 
+void normalize_frame(
+  std::array<float, FrameFeature::frameSize>& query, 
+  std::array<float, FrameFeature::frameSize>& n_query,
+  boundingStructure& bounding)
+{
+  for (int i = 0; i < FrameFeature::frameSize; ++i)
+  {
+    n_query[i] = (query[i] - bounding.featuresMean[i]) / bounding.featuresScale[i];
+  }
+}
+
 void boundingStructure::find_boxes_values(std::vector<std::array<float, FrameFeature::frameSize>> features)
 {
   int smBoxNum = ((features.size() + SM_BOX_SIZE - 1) / SM_BOX_SIZE);

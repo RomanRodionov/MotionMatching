@@ -13,6 +13,11 @@ void normalize_feature(
     const int size, 
     const float weight = 1.0f);
 
+void normalize_frame(
+  std::array<float, FrameFeature::frameSize>& query, 
+  std::array<float, FrameFeature::frameSize>& n_query
+  );
+
 struct boundingStructure
 {
   std::array<float, FrameFeature::frameSize> featuresScale;
