@@ -8,6 +8,11 @@ struct ArgMin
   MatchingScores score;
 };
 
+static ArgMin mm_min2(const ArgMin &a, const ArgMin &b)
+{
+  return a.value < b.value ? a : b; 
+}
+
 static float sqrf(float f)
 {
   return f * f;
@@ -25,8 +30,6 @@ float clampf(float value, float min_bound, float max_bound)
   }
   return value;
 }
-
-
 
 void normalize_frame(
   std::array<float, FrameFeature::frameSize>& query, 
@@ -55,7 +58,7 @@ AnimationIndex solve_motion_matching_heuristic(
   ArgMin best = {INFINITY, curClip, curCadr, best_score};
   std::vector<AnimationClip>& clips = dataBase->clips;
 
-  float score = 0;
+  float score = 0, bestScore = INFINITY;
   std::array<float, FrameFeature::frameSize> goalFeature;
   goal.feature.save_to_array(goalFeature);
   for (int i = 0; i < FrameFeature::frameSize; ++i)
@@ -72,14 +75,65 @@ AnimationIndex solve_motion_matching_heuristic(
     while (frameIdx < dataBase->clipsStarts[nextClip + 1])
     {
       int lrBoxIdx = frameIdx / boundingStructure::LR_BOX_SIZE;
-      int nextBoxFrame = (lrBoxIdx + 1) * boundingStructure::LR_BOX_SIZE;
+      int nextLargeBoxFrame = (lrBoxIdx + 1) * boundingStructure::LR_BOX_SIZE;
+      score = 0;
       for (int i = 0; i < FrameFeature::frameSize; ++i)
       {
         score += sqrf(goalFeature[i] - clampf(goalFeature[i], bounding.lrBoxMin[lrBoxIdx][i], bounding.lrBoxMax[lrBoxIdx][i]));
+        if (score >= bestScore)
+        {
+          break;
+        }
+      }
+      if (score >= bestScore)
+      {
+        frameIdx = nextLargeBoxFrame;
+        continue;
+      }
+      while (frameIdx < nextLargeBoxFrame && frameIdx < dataBase->clipsStarts[nextClip + 1])
+      {
+        int smBoxIdx = frameIdx / boundingStructure::SM_BOX_SIZE;
+        int nextSmallBoxFrame = (smBoxIdx + 1) * boundingStructure::SM_BOX_SIZE;
+        score = 0;
+        for (int i = 0; i < FrameFeature::frameSize; ++i)
+        {
+          score += sqrf(goalFeature[i] - clampf(goalFeature[i], bounding.smBoxMin[smBoxIdx][i], bounding.smBoxMax[smBoxIdx][i]));
+          if (score >= bestScore)
+          {
+            break;
+          }
+        }
+        if (score >= bestScore)
+        {
+          frameIdx = nextSmallBoxFrame;
+          continue;
+        }
+        while (frameIdx < nextSmallBoxFrame && frameIdx < dataBase->clipsStarts[nextClip + 1])
+        {
+          score = 0;
+          for (int i = 0; i < FrameFeature::frameSize; ++i)
+          {
+            score += sqrf(goalFeature[i] - dataBase->normalizedFeatures[frameIdx][i]);
+            if (score >= bestScore)
+            {
+              break;
+            }
+          }
+          if (score < bestScore)
+          {
+            bestScore = score;
+            best.clip = nextClip;
+            best.frame = frameIdx - dataBase->clipsStarts[nextClip];
+          }
+          frameIdx++;
+        }
       }
     }
   }
 
+  MatchingScores realScore = get_score(clips[best.clip].features[best.frame], goal.feature, mmsettings);
+  float matching = realScore.full_score;
+  best = {matching, best.clip, best.frame, realScore};
   best_score = best.score;
   return AnimationIndex(dataBase, best.clip, best.frame);
 }

@@ -46,6 +46,13 @@ AnimationIndex solve_motion_matching_kd_tree(
   const AnimationGoal &goal,
   float tolerance_error);
 
+AnimationIndex solve_motion_matching_heuristic(
+  AnimationDataBasePtr dataBase,
+  const AnimationIndex &index,
+  const AnimationGoal &goal,
+  MatchingScores &best_score,
+  const MotionMatchingSettings &mmsettings);
+
 MotionMatching::MotionMatching(AnimationDataBasePtr dataBase, AnimationLerpedIndex index):
 dataBase(dataBase), index(index), skip_time(0), lod(0)
 {  
@@ -234,6 +241,13 @@ SYSTEM(stage=act;before=animation_player_update) motion_matching_update(
             ProfilerLabel label("ANIMATION_UPDATE");
             MICROPROFILE_SCOPEI("ANIMATION_UPDATE", "KDTree", 0x00ff00);
             best_index = solve_motion_matching_kd_tree(dataBase, new_goal, OptimisationSettings.vpTreeErrorTolerance);
+          }
+          break;
+        case MotionMatchingSolverType::HeuristicBruteForce :
+          {
+            ProfilerLabel label("ANIMATION_UPDATE");
+            MICROPROFILE_SCOPEI("ANIMATION_UPDATE", "HeuristicBruteForce", 0x00ff00);
+            best_index = solve_motion_matching_heuristic(dataBase, currentIndex, new_goal, matching.bestScore, mmsettings);
           }
           break;
         }

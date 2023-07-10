@@ -16,9 +16,9 @@ inline float maxf(float a, float b)
 }
 
 void normalize_feature(
-    std::vector<std::array<float, FrameFeature::frameSize>> features,
-    std::array<float, FrameFeature::frameSize> featuresScale,
-    std::array<float, FrameFeature::frameSize> featuresMean,
+    std::vector<std::array<float, FrameFeature::frameSize>>& features,
+    std::array<float, FrameFeature::frameSize>& featuresScale,
+    std::array<float, FrameFeature::frameSize>& featuresMean,
     int offset, 
     int size, 
     float weight)
@@ -44,6 +44,7 @@ void normalize_feature(
       variations[j] += sqrf(features[i][offset + j] - featuresMean[offset + j]) / features.size();
     }
   }
+
   float std = 0.f;
   for (int j = 0; j < size; j++)
   {

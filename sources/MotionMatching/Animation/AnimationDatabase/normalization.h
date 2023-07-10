@@ -6,9 +6,9 @@
 //based on idea from github.com/orangeduck/Motion-Matching
 
 void normalize_feature(
-    std::vector<std::array<float, FrameFeature::frameSize>> features,
-    std::array<float, FrameFeature::frameSize> featuresScale,
-    std::array<float, FrameFeature::frameSize> featuresMean,
+    std::vector<std::array<float, FrameFeature::frameSize>>& features,
+    std::array<float, FrameFeature::frameSize>& featuresScale,
+    std::array<float, FrameFeature::frameSize>& featuresMean,
     const int offset, 
     const int size, 
     const float weight = 1.0f);
