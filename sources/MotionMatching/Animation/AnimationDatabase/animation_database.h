@@ -21,7 +21,7 @@ public:
   )
   void normalize_database(const MotionMatchingSettings &mmsettings);
   void apply_settings(const MotionMatchingSettings &mmsettings, bool check_state = false);
-  void acceleration_structs(bool applySettingsOnce = false, bool check_existance = false);
+  void acceleration_structs(const MotionMatchingSettings &settings, bool applySettingsOnce = false, bool check_existance = false);
   bool needForceReload;
   std::vector<std::vector<float>> matchingScore;
 

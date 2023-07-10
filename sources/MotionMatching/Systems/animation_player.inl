@@ -36,7 +36,7 @@ EVENT(scene=game, editor) init_animation_character(
     animationPlayer.dataBase.load();
     const MotionMatchingSettings &mmsettings = settingsContainer.motionMatchingSettings[mmIndex ? *mmIndex : 0].second;
     animationPlayer.dataBase->apply_settings(mmsettings, true);
-    animationPlayer.dataBase->acceleration_structs(mmsettings.applySettingsOnce, true);
+    animationPlayer.dataBase->acceleration_structs(mmsettings, mmsettings.applySettingsOnce, true);
     animationPlayer.index = AnimationLerpedIndex(animationPlayer.dataBase, animationPlayer.clip, animationPlayer.frame);
     if (animationPlayer.index)
       animationPlayer.currentCadr = AnimationCadr(animationPlayer.index.get_lerped_cadr());

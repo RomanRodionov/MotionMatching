@@ -150,6 +150,7 @@ SYSTEM(stage=act;before=animation_player_update) motion_matching_update(
     profiler.init(settingsContainer.motionMatchingOptimisationSettings);
     MotionMatching &matching = animationPlayer.motionMatching;
     const MotionMatchingSettings &mmsettings = settingsContainer.motionMatchingSettings[mmIndex ? *mmIndex : 0].second;
+    //debug_log("%s", settingsContainer.motionMatchingSettings[mmIndex ? *mmIndex : 0].first.c_str());
     const MotionMatchingOptimisationSettings &OptimisationSettings = 
       settingsContainer.motionMatchingOptimisationSettings[mmOptimisationIndex].second;
     float dist = length(mainCamera.position - transform.get_position());
