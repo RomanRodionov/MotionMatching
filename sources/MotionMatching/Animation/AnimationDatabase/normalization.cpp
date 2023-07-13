@@ -48,7 +48,7 @@ void normalize_feature(
   float std = 0.f;
   for (int j = 0; j < size; j++)
   {
-    std += sqrf(variations[j]) / size;
+    std += sqrtf(variations[j]) / size;
   }
   for (int j = 0; j < size; j++)
   {
@@ -69,7 +69,7 @@ void boundingStructure::find_boxes_values(std::vector<std::array<float, FrameFea
   int lrBoxNum = ((features.size() + LR_BOX_SIZE - 1) / LR_BOX_SIZE);
 
   std::array<float, FrameFeature::frameSize> posInf = {+FLT_MAX};
-  std::array<float, FrameFeature::frameSize> negInf = {+FLT_MAX};
+  std::array<float, FrameFeature::frameSize> negInf = {-FLT_MAX};
   smBoxMin = std::vector<std::array<float, FrameFeature::frameSize>>(smBoxNum, posInf);
   smBoxMax = std::vector<std::array<float, FrameFeature::frameSize>>(smBoxNum, negInf);
   lrBoxMin = std::vector<std::array<float, FrameFeature::frameSize>>(lrBoxNum, posInf);

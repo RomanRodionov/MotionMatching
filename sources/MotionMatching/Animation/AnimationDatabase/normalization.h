@@ -3,7 +3,6 @@
 #include <vector>
 #include "animation_feature.h"
 
-//based on idea from github.com/orangeduck/Motion-Matching
 
 void normalize_feature(
     std::vector<std::array<float, FrameFeature::frameSize>>& features,

@@ -1,6 +1,8 @@
 #include "motion_matching.h"
 #include "../settings.h"
 
+//based on idea from github.com/orangeduck/Motion-Matching
+
 struct ArgMin
 {
   float value;
